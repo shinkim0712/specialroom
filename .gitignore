@@ -1,0 +1,9 @@
+# 서버 코드는 절대 공개 저장소에 올리지 말 것
+# (시트 ID와 관리자 비밀번호가 들어있음)
+apps-script/
+
+# Mac
+.DS_Store
+
+# Editor
+.vscode/
