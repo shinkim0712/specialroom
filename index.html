@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>특별실 예약 관리</title>
-  <link rel="stylesheet" href="style.css?v=3" />
+  <link rel="stylesheet" href="style.css?v=15" />
 </head>
 <body>
   <div class="container">
@@ -17,11 +17,12 @@
         <button id="todayBtn" class="btn btn-dark">오늘</button>
       </div>
       <div class="actions">
-        <button id="myReservationsBtn" class="btn btn-blue">내예약보기</button>
-        <button id="sheetSettingsBtn" class="btn btn-purple admin-only">구글시트 설정</button>
+        <button id="myReservationsBtn" class="btn btn-blue">내 예약 보기</button>
+        <button id="multiSelectBtn" class="btn btn-dark">다중 선택</button>
         <button id="saveToServerBtn" class="btn btn-orange">서버로 저장</button>
         <button id="loadFromServerBtn" class="btn btn-teal">서버에서 불러오기</button>
-        <button id="adminBtn" class="btn btn-gray" title="관리자 모드">🔒</button>
+        <button id="sheetSettingsBtn" class="btn btn-purple admin-only">구글시트 설정</button>
+        <button id="adminBtn" class="btn btn-red">관리자 모드</button>
       </div>
     </header>
 
@@ -35,6 +36,15 @@
     </main>
   </div>
 
+  <!-- 다중 선택 하단 바 -->
+  <div id="multiSelectBar" class="multi-bar" hidden>
+    <span id="multiSelectCount">0개 선택됨</span>
+    <div>
+      <button class="btn btn-gray" id="multiSelectCancelBtn">선택 취소</button>
+      <button class="btn btn-blue" id="multiSelectConfirmBtn">0개 예약하기</button>
+    </div>
+  </div>
+
   <!-- 예약 입력 모달 -->
   <div class="modal-backdrop" id="reservationModal" hidden>
     <div class="modal">
@@ -42,7 +52,18 @@
       <label>예약자명</label>
       <input id="resName" type="text" />
       <label>학급</label>
-      <input id="resClass" type="text" placeholder="예: 6-1" />
+      <div style="display:flex; gap:8px;">
+        <select id="resGrade" style="flex:1;">
+          <option value="">학년 선택</option>
+          <option>1학년</option><option>2학년</option><option>3학년</option>
+          <option>4학년</option><option>5학년</option><option>6학년</option>
+        </select>
+        <select id="resClassNum" style="flex:1;">
+          <option value="">반 선택</option>
+          <option>1반</option><option>2반</option><option>3반</option><option>4반</option><option>5반</option>
+          <option>6반</option><option>7반</option><option>8반</option><option>9반</option><option>10반</option>
+        </select>
+      </div>
       <label>목적</label>
       <input id="resPurpose" type="text" placeholder="예: 실험 수업" />
       <label>비밀번호 (4자리)</label>
@@ -61,6 +82,7 @@
       <div id="detailInfo"></div>
       <div class="modal-actions">
         <button class="btn btn-gray" data-close>닫기</button>
+        <button class="btn btn-gray admin-only" id="editScheduleFromDetailBtn" hidden>정규시간 편집</button>
         <button class="btn btn-red" id="deleteResBtn">삭제</button>
         <button class="btn btn-blue" id="editResBtn">수정</button>
       </div>
@@ -90,8 +112,9 @@
       <label>자동 불러오기 주기
         <select id="autoLoadInterval">
           <option value="10">10초</option>
-          <option value="20" selected>20초</option>
+          <option value="20">20초</option>
           <option value="60">60초</option>
+          <option value="600" selected>10분</option>
         </select>
       </label>
       <hr />
@@ -120,7 +143,7 @@
     </div>
   </div>
 
-  <script src="api.js"></script>
-  <script src="app.js"></script>
+  <script src="api.js?v=15"></script>
+  <script src="app.js?v=15"></script>
 </body>
 </html>

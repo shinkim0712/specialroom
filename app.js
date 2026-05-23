@@ -1,21 +1,13 @@
 // ===== 상수/기본값 =====
-const DEFAULT_ROOMS = ['음악실', '도서실', '4층 회의실', '1층 시청각실', '다목적실', '체육관', '3층 상담실', '컴퓨터실'];
+const DEFAULT_ROOMS = ['강당', '운동장', '농구장', '시청각실', '소통광장'];
 const PERIODS = [
-  { key: '1',       label: '1교시',       time: '09:00~09:40' },
-  { key: '2',       label: '2교시',       time: '09:50~10:30' },
-  { key: '3',       label: '3교시',       time: '10:40~11:20' },
-  { key: 'lunchE',  label: '점심(저)',    time: '11:20~12:10', lunch: true },
-  { key: '4MH',     label: '4교시(중·고)', time: '11:30~12:10' },
-  { key: '4E',      label: '4교시(저)',   time: '12:10~12:50' },
-  { key: 'lunchH',  label: '점심(고)',    time: '12:10~13:00', lunch: true },
-  { key: '5M',      label: '5교시(중)',   time: '12:20~13:00' },
-  { key: '5EH',     label: '5교시(저·고)', time: '13:00~13:40' },
-  { key: 'lunchM',  label: '점심(중)',    time: '13:00~13:50', lunch: true },
-  { key: '6',       label: '6교시',       time: '13:50~14:30' },
-  { key: '7',       label: '7교시',       time: '' },
-  { key: '8',       label: '8교시',       time: '' },
-  { key: '9',       label: '9교시',       time: '' },
-  { key: '10',      label: '10교시',      time: '' },
+  { key: '1',   label: '1교시', time: '09:00~09:40' },
+  { key: '2',   label: '2교시', time: '09:50~10:30' },
+  { key: '3',   label: '3교시', time: '10:40~11:20' },
+  { key: '4A',  label: '4교시(1)', time: '11:30~12:10' },
+  { key: '4E',  label: '4교시(2)', time: '12:20~13:00' },
+  { key: '5EH', label: '5교시', time: '13:10~13:50' },
+  { key: '6',   label: '6교시', time: '14:00~14:40' },
 ];
 const DAYS = ['월', '화', '수', '목', '금'];
 const ADMIN_PW_LOCAL = '1012';  // 데모용. 서버 연동 시 서버에서 검증
@@ -29,6 +21,9 @@ const state = {
   weekStart: getMondayOf(new Date()),
   isAdmin: sessionStorage.getItem('isAdmin') === '1',
   pendingCell: null,  // {room, date, period}
+  multiSelect: false,
+  selectedCells: [],   // [{room, date, period}]
+  pendingBatch: null,  // 다중 선택 저장 시 사용
   autoLoadTimer: null,
 };
 
@@ -82,6 +77,7 @@ function renderTabs() {
     if (state.isAdmin) {
       b.oncontextmenu = (e) => {
         e.preventDefault();
+        if (state.rooms.length <= 1) { alert('마지막 특별실은 삭제할 수 없습니다.'); return; }
         if (confirm(`'${r}' 특별실을 삭제할까요?`)) {
           state.rooms = state.rooms.filter(x => x !== r);
           if (state.currentRoom === r) state.currentRoom = state.rooms[0] || null;
@@ -171,37 +167,50 @@ function makeCell(room, dateKey, periodKey, dayName) {
   const reservation = state.reservations.find(r =>
     r.room === room && r.date === dateKey && r.period === periodKey
   );
+  const sch = state.schedule.find(s => s.room === room && s.dayOfWeek === dayName && s.period === periodKey);
   if (reservation) {
     td.className = 'reserved';
+    const noteHtml = sch ? `<span class="schedule-note">${escapeHtml(sch.label)}</span>` : '';
     td.innerHTML = `
       <div><span class="star">★</span> <span class="name">${escapeHtml(reservation.name)}</span></div>
       <div class="meta">${escapeHtml(reservation.classroom || '')}</div>
       <div class="meta">${escapeHtml(reservation.purpose || '')}</div>
+      ${noteHtml}
     `;
-    td.onclick = () => openDetail(reservation);
+    td.onclick = () => openDetail(reservation, { room, dayName, periodKey, sch });
   } else {
-    // 정규시간표(회색)
-    const sch = state.schedule.find(s => s.room === room && s.dayOfWeek === dayName && s.period === periodKey);
     td.className = 'empty';
     if (sch) {
-      td.classList.add('schedule-label');
-      td.textContent = sch.label;
+      td.classList.add('has-schedule');
+      td.innerHTML = `<span class="schedule-note">${escapeHtml(sch.label)}</span>`;
     }
     td.onclick = () => {
-      if (state.isAdmin && sch !== undefined) {
-        // 관리자가 회색 셀 클릭 시 편집
-        editScheduleLabel(room, dayName, periodKey, sch);
-      } else {
-        openReservation(room, dateKey, periodKey);
+      // 다중 선택 모드 (관리자/일반 공통)
+      if (state.multiSelect) {
+        // 관리자: 요일+교시 기준 / 일반: 날짜+교시 기준
+        const key = state.isAdmin
+          ? `${room}|${dayName}|${periodKey}`
+          : `${room}|${dateKey}|${periodKey}`;
+        const idx = state.selectedCells.findIndex(c => c._key === key);
+        if (idx >= 0) {
+          state.selectedCells.splice(idx, 1);
+          td.classList.remove('selected');
+        } else {
+          const cell = state.isAdmin
+            ? { _key: key, room, dayName, period: periodKey, sch }
+            : { _key: key, room, date: dateKey, period: periodKey };
+          state.selectedCells.push(cell);
+          td.classList.add('selected');
+        }
+        updateMultiBar();
+        return;
       }
+      if (state.isAdmin) {
+        editScheduleLabel(room, dayName, periodKey, sch || null);
+        return;
+      }
+      openReservation(room, dateKey, periodKey);
     };
-    // 관리자: 회색 셀 추가용 더블클릭
-    if (state.isAdmin && !sch) {
-      td.ondblclick = (e) => {
-        e.stopPropagation();
-        editScheduleLabel(room, dayName, periodKey, null);
-      };
-    }
   }
   return td;
 }
@@ -214,7 +223,8 @@ function escapeHtml(s) {
 function openReservation(room, date, period) {
   state.pendingCell = { room, date, period };
   document.getElementById('resName').value = '';
-  document.getElementById('resClass').value = '';
+  document.getElementById('resGrade').value = '';
+  document.getElementById('resClassNum').value = '';
   document.getElementById('resPurpose').value = '';
   document.getElementById('resPassword').value = '';
   showModal('reservationModal');
@@ -222,37 +232,56 @@ function openReservation(room, date, period) {
 
 document.getElementById('saveReservationBtn').onclick = async () => {
   const name = document.getElementById('resName').value.trim();
-  const classroom = document.getElementById('resClass').value.trim();
+  const grade = document.getElementById('resGrade').value;
+  const classNum = document.getElementById('resClassNum').value;
+  const classroom = (grade && classNum) ? `${grade} ${classNum}` : (grade || classNum);
   const purpose = document.getElementById('resPurpose').value.trim();
   const password = document.getElementById('resPassword').value.trim();
   if (!name) { alert('예약자명을 입력하세요.'); return; }
   if (!/^\d{4}$/.test(password)) { alert('비밀번호는 숫자 4자리입니다.'); return; }
 
   const passwordHash = await sha256(password);
-  const newRes = {
+  const cells = state.pendingBatch || (state.pendingCell ? [state.pendingCell] : []);
+  const newReservations = cells.map(cell => ({
     id: crypto.randomUUID(),
-    ...state.pendingCell,
+    ...cell,
     name, classroom, purpose,
     passwordHash,
     createdAt: new Date().toISOString(),
-  };
-  state.reservations.push(newRes);
+  }));
+  state.reservations.push(...newReservations);
+  state.pendingBatch = null;
   saveState();
   closeAllModals();
-  render();
+  exitMultiSelect();
 
   if (API.enabled() && localStorage.getItem('autoSave') === '1') {
-    try { await API.createReservation(newRes); } catch (e) { console.warn(e); }
+    for (const r of newReservations) {
+      try { await API.createReservation(r); } catch (e) { console.warn(e); }
+    }
   }
 };
 
-async function openDetail(r) {
+async function openDetail(r, ctx) {
   document.getElementById('detailInfo').innerHTML = `
     <p><strong>${escapeHtml(r.name)}</strong> (${escapeHtml(r.classroom||'-')})</p>
     <p>${escapeHtml(r.room)} · ${r.date} · ${periodLabel(r.period)}</p>
     <p>목적: ${escapeHtml(r.purpose||'-')}</p>
   `;
-  document.getElementById('detailModal').dataset.id = r.id;
+  const modal = document.getElementById('detailModal');
+  modal.dataset.id = r.id;
+  const schBtn = document.getElementById('editScheduleFromDetailBtn');
+  if (state.isAdmin && ctx) {
+    schBtn.hidden = false;
+    schBtn.textContent = ctx.sch ? '정규시간 편집' : '정규시간 추가';
+    schBtn.onclick = () => {
+      closeAllModals();
+      editScheduleLabel(ctx.room, ctx.dayName, ctx.periodKey, ctx.sch || null);
+    };
+  } else {
+    schBtn.hidden = true;
+    schBtn.onclick = null;
+  }
   showModal('detailModal');
 }
 
@@ -347,7 +376,7 @@ document.getElementById('adminBtn').onclick = () => {
     state.isAdmin = false;
     sessionStorage.removeItem('isAdmin');
     document.body.classList.remove('admin');
-    alert('관리자 모드 해제');
+    alert('관리자 모드 해제 — 사용자 화면으로 돌아갑니다.');
     render();
     return;
   }
@@ -356,7 +385,7 @@ document.getElementById('adminBtn').onclick = () => {
     state.isAdmin = true;
     sessionStorage.setItem('isAdmin', '1');
     document.body.classList.add('admin');
-    alert('관리자 모드 활성화\n- 회색 셀 더블클릭으로 정규시간표 추가\n- 탭 우클릭으로 특별실 삭제\n- 예약 비밀번호 무시');
+    alert('관리자 모드 활성화\n- 빈 셀 클릭으로 정규시간표 추가/편집\n- 예약된 셀 클릭 시 "정규시간 편집" 버튼 노출\n- 탭 우클릭으로 특별실 삭제\n- 예약 비밀번호 무시');
     render();
   } else {
     alert('비밀번호가 틀립니다.');
@@ -392,13 +421,43 @@ document.getElementById('loadFromServerBtn').onclick = async () => {
   alert('서버에서 불러왔습니다.');
 };
 
+function normalizeDateStr(v) {
+  if (!v) return v;
+  if (typeof v === 'string') {
+    // 이미 YYYY-MM-DD 면 그대로
+    if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+    // ISO 타임스탬프면 한국시간 기준 날짜 추출
+    if (v.indexOf('T') > 0) {
+      const d = new Date(v);
+      const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
+      return kst.toISOString().slice(0, 10);
+    }
+  }
+  if (v instanceof Date) {
+    const kst = new Date(v.getTime() + 9 * 60 * 60 * 1000);
+    return kst.toISOString().slice(0, 10);
+  }
+  return v;
+}
+
 async function loadFromServer({ force = false } = {}) {
   try {
     const data = await API.loadAll();
-    // 안전장치: 서버가 빈 배열이면 로컬 데이터 보호 (force=true일 때만 덮어쓰기)
-    if (Array.isArray(data.rooms) && (force || data.rooms.length > 0)) state.rooms = data.rooms;
-    if (Array.isArray(data.reservations) && (force || data.reservations.length > 0)) state.reservations = data.reservations;
-    if (Array.isArray(data.schedule) && (force || data.schedule.length > 0)) state.schedule = data.schedule;
+    if (Array.isArray(data.reservations)) {
+      data.reservations = data.reservations.map(r => ({
+        ...r,
+        date: normalizeDateStr(r.date),
+        period: String(r.period),
+      }));
+    }
+    if (Array.isArray(data.reservations) && (force || data.reservations.length > 0)) {
+      state.reservations = data.reservations;
+    }
+    // 방 목록·정규시간표는 force(명시적 불러오기)일 때만 덮어씀
+    if (force) {
+      if (Array.isArray(data.rooms) && data.rooms.length > 0) state.rooms = data.rooms;
+      if (Array.isArray(data.schedule)) state.schedule = data.schedule;
+    }
     saveState();
     render();
   } catch (e) { console.warn('loadFromServer failed', e); }
@@ -410,7 +469,7 @@ document.getElementById('sheetSettingsBtn').onclick = () => {
   document.getElementById('serverEnabled').checked = localStorage.getItem('serverEnabled') === '1';
   document.getElementById('autoSave').checked = localStorage.getItem('autoSave') === '1';
   document.getElementById('autoLoad').checked = localStorage.getItem('autoLoad') === '1';
-  document.getElementById('autoLoadInterval').value = localStorage.getItem('autoLoadInterval') || '20';
+  document.getElementById('autoLoadInterval').value = localStorage.getItem('autoLoadInterval') || '600';
   showModal('settingsModal');
 };
 
@@ -455,7 +514,7 @@ document.getElementById('resetLocalBtn').onclick = () => {
 function setupAutoLoad() {
   if (state.autoLoadTimer) clearInterval(state.autoLoadTimer);
   if (API.enabled() && localStorage.getItem('autoLoad') === '1') {
-    const sec = parseInt(localStorage.getItem('autoLoadInterval') || '20', 10);
+    const sec = parseInt(localStorage.getItem('autoLoadInterval') || '600', 10);
     state.autoLoadTimer = setInterval(loadFromServer, sec * 1000);
   }
 }
@@ -469,6 +528,68 @@ document.querySelectorAll('[data-close]').forEach(b => b.onclick = closeAllModal
 document.querySelectorAll('.modal-backdrop').forEach(m => {
   m.addEventListener('click', (e) => { if (e.target === m) closeAllModals(); });
 });
+
+// ===== 다중 선택 =====
+function updateMultiBar() {
+  const n = state.selectedCells.length;
+  const bar = document.getElementById('multiSelectBar');
+  document.getElementById('multiSelectCount').textContent = `${n}개 선택됨`;
+  document.getElementById('multiSelectConfirmBtn').textContent = state.isAdmin
+    ? `${n}개 정규시간 추가`
+    : `${n}개 예약하기`;
+  bar.hidden = !state.multiSelect;
+}
+
+function exitMultiSelect() {
+  state.multiSelect = false;
+  state.selectedCells = [];
+  document.body.classList.remove('multi-select');
+  document.getElementById('multiSelectBtn').classList.remove('active');
+  document.getElementById('multiSelectBar').hidden = true;
+  render();
+}
+
+document.getElementById('multiSelectBtn').onclick = () => {
+  state.multiSelect = !state.multiSelect;
+  state.selectedCells = [];
+  document.body.classList.toggle('multi-select', state.multiSelect);
+  document.getElementById('multiSelectBtn').classList.toggle('active', state.multiSelect);
+  updateMultiBar();
+  if (state.multiSelect) render();
+};
+
+document.getElementById('multiSelectCancelBtn').onclick = exitMultiSelect;
+
+document.getElementById('multiSelectConfirmBtn').onclick = () => {
+  if (state.selectedCells.length === 0) return;
+
+  if (state.isAdmin) {
+    // 관리자: 정규시간 라벨 일괄 입력
+    const label = prompt(`선택한 ${state.selectedCells.length}개 칸의 정규시간 라벨을 입력하세요:\n(비우면 해당 칸의 정규시간 삭제)`);
+    if (label === null) return; // 취소
+    for (const c of state.selectedCells) {
+      state.schedule = state.schedule.filter(
+        s => !(s.room === c.room && s.dayOfWeek === c.dayName && s.period === c.period)
+      );
+      if (label.trim()) {
+        state.schedule.push({ room: c.room, dayOfWeek: c.dayName, period: c.period, label: label.trim() });
+      }
+    }
+    saveState();
+    exitMultiSelect();
+    return;
+  }
+
+  // 일반 사용자: 예약 일괄 입력
+  state.pendingCell = null;
+  state.pendingBatch = [...state.selectedCells];
+  document.getElementById('resName').value = '';
+  document.getElementById('resGrade').value = '';
+  document.getElementById('resClassNum').value = '';
+  document.getElementById('resPurpose').value = '';
+  document.getElementById('resPassword').value = '';
+  showModal('reservationModal');
+};
 
 // ===== 초기화 =====
 function render() {
