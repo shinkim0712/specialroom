@@ -265,6 +265,7 @@ document.getElementById('deleteResBtn').onclick = async () => {
   const id = document.getElementById('detailModal').dataset.id;
   const r = state.reservations.find(x => x.id === id);
   if (!r) return;
+  if (!confirm(`'${r.name}'님의 예약을 정말 삭제하시겠습니까?\n${r.date} ${periodLabel(r.period)}`)) return;
   const ok = await verifyPassword(r);
   if (!ok) return;
   state.reservations = state.reservations.filter(x => x.id !== id);
@@ -386,17 +387,18 @@ document.getElementById('saveToServerBtn').onclick = async () => {
 
 document.getElementById('loadFromServerBtn').onclick = async () => {
   if (!API.enabled()) { alert('서버 연동이 비활성화되어 있습니다.'); return; }
-  if (!confirm('서버(구글 시트)의 데이터로 현재 데이터를 덮어쓰시겠습니까?')) return;
-  await loadFromServer();
+  if (!confirm('서버(구글 시트)의 데이터로 현재 데이터를 덮어쓰시겠습니까?\n(서버가 비어있으면 로컬 데이터가 모두 사라집니다)')) return;
+  await loadFromServer({ force: true });
   alert('서버에서 불러왔습니다.');
 };
 
-async function loadFromServer() {
+async function loadFromServer({ force = false } = {}) {
   try {
     const data = await API.loadAll();
-    if (data.rooms) state.rooms = data.rooms;
-    if (data.reservations) state.reservations = data.reservations;
-    if (data.schedule) state.schedule = data.schedule;
+    // 안전장치: 서버가 빈 배열이면 로컬 데이터 보호 (force=true일 때만 덮어쓰기)
+    if (Array.isArray(data.rooms) && (force || data.rooms.length > 0)) state.rooms = data.rooms;
+    if (Array.isArray(data.reservations) && (force || data.reservations.length > 0)) state.reservations = data.reservations;
+    if (Array.isArray(data.schedule) && (force || data.schedule.length > 0)) state.schedule = data.schedule;
     saveState();
     render();
   } catch (e) { console.warn('loadFromServer failed', e); }
