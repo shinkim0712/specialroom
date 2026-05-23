@@ -161,6 +161,21 @@
         ⚠️ 코드를 수정할 때마다 <strong>새 배포</strong>가 아닌 <strong>배포 관리 → 편집</strong>으로 업데이트해야 URL이 유지됩니다.</p>
       </div>
       <div class="modal-actions">
+        <button class="btn btn-dark" id="showCodeBtn">Code.gs 보기</button>
+        <button class="btn btn-gray" data-close>닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Code.gs 팝업 -->
+  <div class="modal-backdrop" id="codeModal" hidden>
+    <div class="modal modal-wide">
+      <h3 style="display:flex; justify-content:space-between; align-items:center;">
+        Code.gs
+        <button id="copyCodeBtn" class="btn btn-blue" style="font-size:13px; padding:6px 12px;">복사</button>
+      </h3>
+      <pre id="codeContent" style="background:#1e1e1e; color:#d4d4d4; padding:16px; border-radius:8px; font-size:12px; overflow:auto; max-height:60vh; white-space:pre; font-family:monospace;"></pre>
+      <div class="modal-actions">
         <button class="btn btn-gray" data-close>닫기</button>
       </div>
     </div>

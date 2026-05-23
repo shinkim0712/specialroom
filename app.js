@@ -467,7 +467,183 @@ async function loadFromServer({ force = false } = {}) {
 }
 
 // ===== 설정 모달 =====
+const CODE_GS = `/**
+ * 특별실 예약 서버 (Google Apps Script Web App)
+ */
+
+const SHEET_ID = '구글 시트 아이디 입력';
+const ADMIN_PW = '관리자 비밀번호';
+
+const HEADERS = {
+  reservations: ['id', 'room', 'date', 'period', 'name', 'classroom', 'purpose', 'passwordHash', 'createdAt'],
+  rooms: ['name', 'order'],
+  schedule: ['room', 'dayOfWeek', 'period', 'label'],
+};
+
+function doGet(e) {
+  const action = (e.parameter && e.parameter.action) || 'ping';
+  try {
+    if (action === 'ping')     return json({ ok: true, ts: new Date().toISOString() });
+    if (action === 'list')     return json(readSheet('reservations'));
+    if (action === 'schedule') return json(readSheet('schedule'));
+    if (action === 'rooms')    return json(readSheet('rooms'));
+    if (action === 'loadAll')  return json({
+      rooms: readSheet('rooms').sort((a,b)=>(a.order||0)-(b.order||0)).map(r => r.name),
+      reservations: readSheet('reservations'),
+      schedule: readSheet('schedule'),
+    });
+    return json({ error: 'unknown action: ' + action });
+  } catch (err) { return json({ error: String(err) }); }
+}
+
+function doPost(e) {
+  let body = {};
+  try { body = JSON.parse(e.postData.contents); } catch (_) {}
+  const action = body.action;
+  try {
+    if (action === 'create')  return json(createReservation(body));
+    if (action === 'update')  return json(updateReservation(body));
+    if (action === 'delete')  return json(deleteReservation(body));
+    if (action === 'saveAll') return json(saveAll(body));
+    if (action === 'cleanup') return json(cleanup(body));
+    return json({ error: 'unknown action: ' + action });
+  } catch (err) { return json({ error: String(err) }); }
+}
+
+function createReservation(body) {
+  const sheet = sheetOf('reservations');
+  const all = readSheet('reservations');
+  if (all.some(r => r.room === body.room && r.date === body.date && r.period === body.period)) {
+    return { ok: false, error: 'already reserved' };
+  }
+  sheet.appendRow([
+    body.id || Utilities.getUuid(),
+    body.room, body.date, body.period,
+    body.name, body.classroom || '', body.purpose || '',
+    body.passwordHash || '',
+    body.createdAt || new Date().toISOString(),
+  ]);
+  return { ok: true, id: body.id };
+}
+
+function updateReservation(body) {
+  const sheet = sheetOf('reservations');
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const idCol = headers.indexOf('id');
+  const pwCol = headers.indexOf('passwordHash');
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][idCol] === body.id) {
+      if (!isAuthorized(body, data[i][pwCol])) return { ok: false, error: 'unauthorized' };
+      ['room','date','period','name','classroom','purpose'].forEach(k => {
+        if (body[k] !== undefined) {
+          const col = headers.indexOf(k);
+          sheet.getRange(i+1, col+1).setValue(body[k]);
+        }
+      });
+      return { ok: true };
+    }
+  }
+  return { ok: false, error: 'not found' };
+}
+
+function deleteReservation(body) {
+  const sheet = sheetOf('reservations');
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const idCol = headers.indexOf('id');
+  const pwCol = headers.indexOf('passwordHash');
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][idCol] === body.id) {
+      if (!isAuthorized(body, data[i][pwCol])) return { ok: false, error: 'unauthorized' };
+      sheet.deleteRow(i+1);
+      return { ok: true };
+    }
+  }
+  return { ok: false, error: 'not found' };
+}
+
+function saveAll(body) {
+  if (body.rooms)        writeSheet('rooms', body.rooms.map((name, i) => ({ name, order: i })));
+  if (body.reservations) writeSheet('reservations', body.reservations);
+  if (body.schedule)     writeSheet('schedule', body.schedule);
+  return { ok: true };
+}
+
+function cleanup(body) {
+  if (body.adminPw !== ADMIN_PW) return { ok: false, error: 'unauthorized' };
+  const res = readSheet('reservations');
+  const seen = new Set();
+  const cleaned = res.filter(r => {
+    if (!r.id || seen.has(r.id)) return false;
+    seen.add(r.id); return true;
+  });
+  writeSheet('reservations', cleaned);
+  return { ok: true, removed: res.length - cleaned.length };
+}
+
+function sheetOf(name) {
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  let s = ss.getSheetByName(name);
+  if (!s) { s = ss.insertSheet(name); s.appendRow(HEADERS[name]); }
+  return s;
+}
+
+function readSheet(name) {
+  const sheet = sheetOf(name);
+  const data = sheet.getDataRange().getValues();
+  if (data.length < 2) return [];
+  const headers = data[0];
+  return data.slice(1).filter(row => row.some(v => v !== ''))
+    .map(row => Object.fromEntries(headers.map((h, i) => [h, normalizeCell(h, row[i])])));
+}
+
+function normalizeCell(header, value) {
+  if (header === 'date' && value instanceof Date)
+    return Utilities.formatDate(value, 'Asia/Seoul', 'yyyy-MM-dd');
+  if (header === 'date' && typeof value === 'string' && value.indexOf('T') > 0) {
+    const d = new Date(value);
+    return Utilities.formatDate(d, 'Asia/Seoul', 'yyyy-MM-dd');
+  }
+  if (header === 'period') return String(value);
+  return value;
+}
+
+function writeSheet(name, rows) {
+  const sheet = sheetOf(name);
+  const headers = HEADERS[name];
+  sheet.clear();
+  sheet.appendRow(headers);
+  if (!rows.length) return;
+  const matrix = rows.map(r => headers.map(h => r[h] !== undefined ? r[h] : ''));
+  sheet.getRange(2, 1, matrix.length, headers.length).setValues(matrix);
+}
+
+function isAuthorized(body, storedHash) {
+  if (body.adminPw === ADMIN_PW) return true;
+  if (body.passwordHash && body.passwordHash === storedHash) return true;
+  return false;
+}
+
+function json(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}`;
+
 document.getElementById('settingsHelpBtn').onclick = () => showModal('settingsHelpModal');
+
+document.getElementById('showCodeBtn').onclick = () => {
+  document.getElementById('codeContent').textContent = CODE_GS;
+  showModal('codeModal');
+};
+
+document.getElementById('copyCodeBtn').onclick = () => {
+  navigator.clipboard.writeText(CODE_GS).then(() => {
+    const btn = document.getElementById('copyCodeBtn');
+    btn.textContent = '복사됨!';
+    setTimeout(() => { btn.textContent = '복사'; }, 2000);
+  });
+};
 
 document.getElementById('sheetSettingsBtn').onclick = () => {
   document.getElementById('apiUrlInput').value = localStorage.getItem('apiUrl') || '';
