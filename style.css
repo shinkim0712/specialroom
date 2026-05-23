@@ -20,7 +20,9 @@ body {
   gap: 8px;
 }
 .date-nav, .actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-#weekSelect { padding: 6px 10px; border-radius: 6px; border: 1px solid #ddd; font-size: 14px; }
+#weekSelect { padding: 10px 16px; border-radius: 8px; border: 1px solid #ddd; font-size: 17px; font-weight: 600; height: 44px; }
+.btn-icon { width: 44px !important; height: 44px !important; font-size: 18px; }
+.date-nav .btn { font-size: 16px; padding: 10px 18px; }
 
 /* 버튼 */
 .btn {
@@ -140,7 +142,7 @@ h2 { margin: 4px 0 12px; font-size: 18px; }
 .modal-wide { width: 600px; }
 .modal h3 { margin: 0 0 16px; font-size: 18px; }
 .modal label { display: block; margin: 12px 0 4px; font-size: 13px; color: #555; }
-.modal input[type="text"], .modal input[type="password"], .modal select {
+.modal input[type="text"], .modal input[type="password"], .modal input[type="date"], .modal select {
   width: 100%; padding: 8px 10px;
   border: 1px solid #ddd; border-radius: 6px; font-size: 14px;
   height: 38px; box-sizing: border-box;
@@ -162,6 +164,20 @@ h2 { margin: 4px 0 12px; font-size: 18px; }
 }
 .my-item .info { font-size: 13px; color: #555; }
 .my-item .room { font-weight: 600; font-size: 15px; color: #222; }
+
+/* 기간 정규시간 */
+.period-checks { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.period-check-item {
+  display: flex; align-items: center; gap: 4px;
+  padding: 6px 10px; border: 1px solid #ddd; border-radius: 6px;
+  cursor: pointer; font-size: 13px; user-select: none;
+}
+.period-check-item input { cursor: pointer; }
+.date-rule-item {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px; border: 1px solid #e5e7eb; border-radius: 8px;
+  margin-bottom: 8px; font-size: 13px;
+}
 
 /* 다중 선택 */
 .schedule td.selected {
@@ -200,6 +216,7 @@ body.multi-select .schedule td.empty {
 /* 관리자 전용 요소 */
 .admin-only { display: none; }
 body.admin .admin-only { display: inline-block; }
+body.admin #myReservationsBtn { display: none; }
 
 /* 관리자 모드 활성 시 관리자 버튼 강조 */
 body.admin #adminBtn {

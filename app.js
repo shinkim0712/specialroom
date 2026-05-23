@@ -15,8 +15,9 @@ const ADMIN_PW_LOCAL = '1012';  // 데모용. 서버 연동 시 서버에서 검
 // ===== 상태 =====
 const state = {
   rooms: load('rooms', DEFAULT_ROOMS),
-  reservations: load('reservations', []),  // {id, room, date, period, name, classroom, purpose, passwordHash, createdAt}
+  reservations: load('reservations', []),  // {id, room, date, period, name, classroom, purpose, createdAt}
   schedule: load('schedule', []),          // {room, dayOfWeek, period, label}
+  dateRules: load('dateRules', []),        // {id, room, startDate, endDate, periods:[], label}
   currentRoom: null,
   weekStart: getMondayOf(new Date()),
   isAdmin: sessionStorage.getItem('isAdmin') === '1',
@@ -168,9 +169,15 @@ function makeCell(room, dateKey, periodKey, dayName) {
     r.room === room && r.date === dateKey && r.period === periodKey
   );
   const sch = state.schedule.find(s => s.room === room && s.dayOfWeek === dayName && s.period === periodKey);
+  const matchingRules = state.dateRules.filter(r =>
+    r.room === room && r.periods.includes(periodKey) &&
+    dateKey >= r.startDate && dateKey <= r.endDate
+  );
+  const dateRule = matchingRules.length ? matchingRules[matchingRules.length - 1] : null;
+  const scheduleNote = dateRule ? dateRule.label : (sch ? sch.label : null);
   if (reservation) {
     td.className = 'reserved';
-    const noteHtml = sch ? `<span class="schedule-note">${escapeHtml(sch.label)}</span>` : '';
+    const noteHtml = scheduleNote ? `<span class="schedule-note">${escapeHtml(scheduleNote)}</span>` : '';
     td.innerHTML = `
       <div><span class="star">★</span> <span class="name">${escapeHtml(reservation.name)}</span></div>
       <div class="meta">${escapeHtml(reservation.classroom || '')}</div>
@@ -180,9 +187,9 @@ function makeCell(room, dateKey, periodKey, dayName) {
     td.onclick = () => openDetail(reservation, { room, dayName, periodKey, sch });
   } else {
     td.className = 'empty';
-    if (sch) {
+    if (scheduleNote) {
       td.classList.add('has-schedule');
-      td.innerHTML = `<span class="schedule-note">${escapeHtml(sch.label)}</span>`;
+      td.innerHTML = `<span class="schedule-note">${escapeHtml(scheduleNote)}</span>`;
     }
     td.onclick = () => {
       // 다중 선택 모드 (관리자/일반 공통)
@@ -197,7 +204,7 @@ function makeCell(room, dateKey, periodKey, dayName) {
           td.classList.remove('selected');
         } else {
           const cell = state.isAdmin
-            ? { _key: key, room, dayName, period: periodKey, sch }
+            ? { _key: key, room, dayName, period: periodKey, sch: sch || null }
             : { _key: key, room, date: dateKey, period: periodKey };
           state.selectedCells.push(cell);
           td.classList.add('selected');
@@ -226,7 +233,6 @@ function openReservation(room, date, period) {
   document.getElementById('resGrade').value = '';
   document.getElementById('resClassNum').value = '';
   document.getElementById('resPurpose').value = '';
-  document.getElementById('resPassword').value = '';
   showModal('reservationModal');
 }
 
@@ -236,17 +242,13 @@ document.getElementById('saveReservationBtn').onclick = async () => {
   const classNum = document.getElementById('resClassNum').value;
   const classroom = (grade && classNum) ? `${grade} ${classNum}` : (grade || classNum);
   const purpose = document.getElementById('resPurpose').value.trim();
-  const password = document.getElementById('resPassword').value.trim();
   if (!name) { alert('예약자명을 입력하세요.'); return; }
-  if (!/^\d{4}$/.test(password)) { alert('비밀번호는 숫자 4자리입니다.'); return; }
 
-  const passwordHash = await sha256(password);
   const cells = state.pendingBatch || (state.pendingCell ? [state.pendingCell] : []);
   const newReservations = cells.map(cell => ({
     id: crypto.randomUUID(),
     ...cell,
     name, classroom, purpose,
-    passwordHash,
     createdAt: new Date().toISOString(),
   }));
   state.reservations.push(...newReservations);
@@ -295,14 +297,12 @@ document.getElementById('deleteResBtn').onclick = async () => {
   const r = state.reservations.find(x => x.id === id);
   if (!r) return;
   if (!confirm(`'${r.name}'님의 예약을 정말 삭제하시겠습니까?\n${r.date} ${periodLabel(r.period)}`)) return;
-  const ok = await verifyPassword(r);
-  if (!ok) return;
   state.reservations = state.reservations.filter(x => x.id !== id);
   saveState();
   closeAllModals();
   render();
   if (API.enabled() && localStorage.getItem('autoSave') === '1') {
-    try { await API.deleteReservation(id, 'admin-or-verified'); } catch (e) { console.warn(e); }
+    try { await API.deleteReservation(id, ADMIN_PW_LOCAL); } catch (e) { console.warn(e); }
   }
 };
 
@@ -310,8 +310,6 @@ document.getElementById('editResBtn').onclick = async () => {
   const id = document.getElementById('detailModal').dataset.id;
   const r = state.reservations.find(x => x.id === id);
   if (!r) return;
-  const ok = await verifyPassword(r);
-  if (!ok) return;
   const newPurpose = prompt('목적을 수정하세요:', r.purpose || '');
   if (newPurpose === null) return;
   r.purpose = newPurpose.trim();
@@ -319,15 +317,6 @@ document.getElementById('editResBtn').onclick = async () => {
   closeAllModals();
   render();
 };
-
-async function verifyPassword(r) {
-  if (state.isAdmin) return true;
-  const pw = prompt('예약을 수정/삭제하려면 비밀번호(4자리)를 입력하세요:');
-  if (pw === null) return false;
-  const h = await sha256(pw);
-  if (h !== r.passwordHash) { alert('비밀번호가 일치하지 않습니다.'); return false; }
-  return true;
-}
 
 // ===== 내 예약 보기 =====
 document.getElementById('myReservationsBtn').onclick = () => {
@@ -361,14 +350,28 @@ window.gotoReservation = (id) => {
 };
 
 // ===== 정규시간표 편집 =====
+let _schedulePending = null;
+
 function editScheduleLabel(room, dayOfWeek, period, existing) {
-  const v = prompt('표시할 텍스트 (비우면 삭제):', existing ? existing.label : '');
-  if (v === null) return;
-  state.schedule = state.schedule.filter(s => !(s.room === room && s.dayOfWeek === dayOfWeek && s.period === period));
-  if (v.trim()) state.schedule.push({ room, dayOfWeek, period, label: v.trim() });
-  saveState();
-  render();
+  _schedulePending = { room, dayOfWeek, period };
+  const pLabel = PERIODS.find(p => p.key === period)?.label || period;
+  document.getElementById('scheduleLabelTitle').textContent = `정규시간 설정 — ${dayOfWeek} ${pLabel}`;
+  document.getElementById('scheduleLabelInput').value = existing ? existing.label : '';
+  showModal('scheduleLabelModal');
+  setTimeout(() => document.getElementById('scheduleLabelInput').focus(), 50);
 }
+
+document.getElementById('scheduleLabelSaveBtn').onclick = () => {
+  if (!_schedulePending) return;
+  const { room, dayOfWeek, period } = _schedulePending;
+  const v = document.getElementById('scheduleLabelInput').value.trim();
+  state.schedule = state.schedule.filter(s => !(s.room === room && s.dayOfWeek === dayOfWeek && s.period === period));
+  if (v) state.schedule.push({ room, dayOfWeek, period, label: v });
+  saveState();
+  closeAllModals();
+  render();
+  _schedulePending = null;
+};
 
 // ===== 관리자 모드 =====
 document.getElementById('adminBtn').onclick = () => {
@@ -385,7 +388,7 @@ document.getElementById('adminBtn').onclick = () => {
     state.isAdmin = true;
     sessionStorage.setItem('isAdmin', '1');
     document.body.classList.add('admin');
-    alert('관리자 모드 활성화\n- 빈 셀 클릭으로 정규시간표 추가/편집\n- 예약된 셀 클릭 시 "정규시간 편집" 버튼 노출\n- 탭 우클릭으로 특별실 삭제\n- 예약 비밀번호 무시');
+    alert('관리자 모드 활성화\n\n[정규시간 관리]\n- 빈 셀 클릭 → 정규시간 추가/편집\n- 기간 정규시간 버튼 → 날짜 범위로 일괄 설정\n- 다중 선택 → 여러 셀 한번에 설정\n\n[특별실 관리]\n- 탭 우클릭 → 특별실 삭제\n- + 특별실 추가 버튼으로 추가 가능\n\n[서버]\n- 구글시트 설정에서 연동 관리');
     render();
   } else {
     alert('비밀번호가 틀립니다.');
@@ -464,6 +467,8 @@ async function loadFromServer({ force = false } = {}) {
 }
 
 // ===== 설정 모달 =====
+document.getElementById('settingsHelpBtn').onclick = () => showModal('settingsHelpModal');
+
 document.getElementById('sheetSettingsBtn').onclick = () => {
   document.getElementById('apiUrlInput').value = localStorage.getItem('apiUrl') || '';
   document.getElementById('serverEnabled').checked = localStorage.getItem('serverEnabled') === '1';
@@ -528,6 +533,64 @@ document.querySelectorAll('[data-close]').forEach(b => b.onclick = closeAllModal
 document.querySelectorAll('.modal-backdrop').forEach(m => {
   m.addEventListener('click', (e) => { if (e.target === m) closeAllModals(); });
 });
+
+// ===== flatpickr 초기화 =====
+const fpStart = flatpickr('#drStart', { locale: 'ko', dateFormat: 'Y-m-d', disableMobile: true });
+const fpEnd   = flatpickr('#drEnd',   { locale: 'ko', dateFormat: 'Y-m-d', disableMobile: true });
+
+// ===== 기간 정규시간 =====
+document.getElementById('dateRuleBtn').onclick = () => {
+  const sel = document.getElementById('drRoom');
+  sel.innerHTML = state.rooms.map(r => `<option value="${escapeHtml(r)}">${escapeHtml(r)}</option>`).join('');
+  document.getElementById('drPeriods').innerHTML = PERIODS.map(p => `
+    <label class="period-check-item">
+      <input type="checkbox" value="${p.key}"> ${p.label}
+    </label>`).join('');
+  const today = new Date().toISOString().slice(0, 10);
+  fpStart.setDate(today, true);
+  fpEnd.setDate(today, true);
+  document.getElementById('drLabel').value = '';
+  renderDateRuleList();
+  showModal('dateRuleModal');
+};
+
+function renderDateRuleList() {
+  const list = document.getElementById('dateRuleList');
+  if (!state.dateRules.length) { list.innerHTML = ''; return; }
+  list.innerHTML = `
+    <p style="margin:16px 0 8px; font-weight:600; font-size:13px; color:#555;">등록된 기간 규칙</p>
+    ${state.dateRules.map(r => `
+      <div class="date-rule-item">
+        <div>
+          <strong>${escapeHtml(r.room)}</strong> · ${r.startDate} ~ ${r.endDate}<br>
+          <span style="font-size:12px; color:#555;">${r.periods.map(k => PERIODS.find(p=>p.key===k)?.label||k).join(', ')} · ${escapeHtml(r.label)}</span>
+        </div>
+        <button class="btn btn-red" style="font-size:12px; padding:4px 10px;" onclick="deleteDateRule('${r.id}')">삭제</button>
+      </div>`).join('')}`;
+}
+
+function deleteDateRule(id) {
+  state.dateRules = state.dateRules.filter(r => r.id !== id);
+  saveState();
+  render();
+  renderDateRuleList();
+}
+
+document.getElementById('saveDateRuleBtn').onclick = () => {
+  const room = document.getElementById('drRoom').value;
+  const startDate = document.getElementById('drStart').value;
+  const endDate = document.getElementById('drEnd').value;
+  const label = document.getElementById('drLabel').value.trim();
+  const periods = [...document.querySelectorAll('#drPeriods input:checked')].map(el => el.value);
+  if (!startDate || !endDate) { alert('기간을 입력하세요.'); return; }
+  if (startDate > endDate) { alert('시작일이 종료일보다 늦습니다.'); return; }
+  if (!periods.length) { alert('교시를 하나 이상 선택하세요.'); return; }
+  if (!label) { alert('라벨을 입력하세요.'); return; }
+  state.dateRules.push({ id: crypto.randomUUID(), room, startDate, endDate, periods, label });
+  saveState();
+  render();
+  renderDateRuleList();
+};
 
 // ===== 다중 선택 =====
 function updateMultiBar() {
