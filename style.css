@@ -119,6 +119,29 @@ h2 { margin: 4px 0 12px; font-size: 18px; font-family: "Hanken Grotesk", "Noto S
 .schedule td.empty.holiday-cell:hover { background: #e5e7eb; }
 .schedule td.empty.blocked-cell { background: repeating-linear-gradient(45deg, #fee2e2, #fee2e2 8px, #fecaca 8px, #fecaca 16px); }
 .schedule td.empty.blocked-cell:hover { filter: brightness(0.97); }
+
+/* 월별 보기 */
+.month-nav { display: flex; align-items: center; justify-content: center; gap: 16px; margin-bottom: 12px; }
+.month-nav span { font-size: 18px; font-weight: 700; min-width: 120px; text-align: center; }
+.month-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.month-table th, .month-table td {
+  border: 1px solid #e2e8f0;
+  text-align: center;
+  vertical-align: top;
+  height: 84px;
+  padding: 6px;
+  font-size: 13px;
+}
+.month-table th { background: #f1f4f6; font-weight: 600; padding: 8px; }
+.month-table td.outside { color: #ccc; background: #fafafa; }
+.month-table td.weekend { background: #fafafa; color: #bbb; }
+.month-table td.day-cell { cursor: pointer; }
+.month-table td.day-cell:hover { box-shadow: inset 0 0 0 1px #2c5282; }
+.month-table td.holiday { background: #f3f4f6; }
+.month-table .day-num { font-weight: 600; }
+.month-table .day-holiday { display: block; font-size: 11px; color: #ef4444; margin-top: 2px; }
+.month-table .day-count { display: block; font-size: 11px; color: #0e3b69; font-weight: 600; margin-top: 4px; background: #dbeafe; border-radius: 10px; padding: 1px 6px; }
+
 .schedule td.reserved {
   background: rgba(190, 238, 205, 0.4);
   cursor: pointer;

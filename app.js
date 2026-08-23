@@ -89,6 +89,8 @@ const state = {
   customHolidays: load('customHolidays', []),  // {id, startDate, endDate, label} — 방학·재량휴업일 등 학교자체 휴일
   currentRoom: null,
   weekStart: getMondayOf(new Date()),
+  viewMode: 'week',  // 'week' | 'month'
+  monthCursor: new Date(),  // 월별 보기에서 현재 보고 있는 달의 아무 날짜
   isAdmin: sessionStorage.getItem('isAdmin') === '1',
   pendingCell: null,  // {room, date, period}
   multiSelect: false,
@@ -1236,9 +1238,84 @@ document.getElementById('multiSelectConfirmBtn').onclick = async () => {
 // ===== 초기화 =====
 function render() {
   renderTabs();
-  renderWeekSelect();
-  renderSchedule();
+  const isMonth = state.viewMode === 'month';
+  document.querySelector('.date-nav').style.display = isMonth ? 'none' : 'flex';
+  document.getElementById('roomTitle').style.display = isMonth ? 'none' : '';
+  document.getElementById('scheduleTable').style.display = isMonth ? 'none' : '';
+  document.getElementById('monthView').style.display = isMonth ? 'block' : 'none';
+  document.getElementById('monthViewBtn').textContent = isMonth ? '주간 보기' : '월별 보기';
+  if (isMonth) {
+    renderMonthView();
+  } else {
+    renderWeekSelect();
+    renderSchedule();
+  }
 }
+
+// ===== 월별 보기 =====
+function renderMonthView() {
+  const y = state.monthCursor.getFullYear();
+  const m = state.monthCursor.getMonth();
+  document.getElementById('monthLabel').textContent = `${y}년 ${m + 1}월`;
+
+  const firstOfMonth = new Date(y, m, 1);
+  const lastOfMonth = new Date(y, m + 1, 0);
+  const gridStart = getMondayOf(firstOfMonth);
+  const gridEnd = getMondayOf(lastOfMonth);
+  const weeksNeeded = Math.round((gridEnd - gridStart) / (7 * 86400000)) + 1;
+
+  const table = document.getElementById('monthTable');
+  table.innerHTML = `<thead><tr>${['월','화','수','목','금','토','일'].map(d => `<th>${d}</th>`).join('')}</tr></thead>`;
+  const tbody = document.createElement('tbody');
+
+  for (let w = 0; w < weeksNeeded; w++) {
+    const tr = document.createElement('tr');
+    for (let d = 0; d < 7; d++) {
+      const day = addDays(gridStart, w * 7 + d);
+      const dateKey = fmtDateKey(day);
+      const inMonth = day.getMonth() === m;
+      const isWeekend = d >= 5;
+      const td = document.createElement('td');
+      td.innerHTML = `<span class="day-num">${day.getDate()}</span>`;
+      if (!inMonth) {
+        td.classList.add('outside');
+      } else if (isWeekend) {
+        td.classList.add('weekend');
+      } else {
+        const holiday = getHolidayLabel(dateKey);
+        const count = state.reservations.filter(r => r.room === state.currentRoom && r.date === dateKey).length;
+        if (holiday) {
+          td.classList.add('holiday');
+          td.innerHTML += `<span class="day-holiday">${escapeHtml(holiday)}</span>`;
+        }
+        if (count) td.innerHTML += `<span class="day-count">${count}건</span>`;
+        td.classList.add('day-cell');
+        td.onclick = () => {
+          state.weekStart = getMondayOf(day);
+          state.viewMode = 'week';
+          render();
+        };
+      }
+      tr.appendChild(td);
+    }
+    tbody.appendChild(tr);
+  }
+  table.appendChild(tbody);
+}
+
+document.getElementById('monthViewBtn').onclick = () => {
+  state.viewMode = state.viewMode === 'month' ? 'week' : 'month';
+  if (state.viewMode === 'month') state.monthCursor = new Date(state.weekStart);
+  render();
+};
+document.getElementById('prevMonth').onclick = () => {
+  state.monthCursor = new Date(state.monthCursor.getFullYear(), state.monthCursor.getMonth() - 1, 1);
+  renderMonthView();
+};
+document.getElementById('nextMonth').onclick = () => {
+  state.monthCursor = new Date(state.monthCursor.getFullYear(), state.monthCursor.getMonth() + 1, 1);
+  renderMonthView();
+};
 
 // config.js 값을 localStorage에 적용. config version이 바뀌면 모든 브라우저에 다시 적용.
 // (같은 version 안에서는 사용자가 설정창에서 바꾼 값이 유지됨)

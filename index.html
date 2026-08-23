@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=Hanken+Grotesk:wght@600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=30" />
+  <link rel="stylesheet" href="style.css?v=31" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
   <style>
     .flatpickr-calendar { font-size: 16px !important; width: 380px !important; }
@@ -27,6 +27,7 @@
         <input type="text" id="weekPicker" style="display:none">
         <button id="nextWeek" class="btn-icon">→</button>
         <button id="todayBtn" class="btn btn-dark">오늘</button>
+        <button id="monthViewBtn" class="btn btn-dark">월별 보기</button>
       </div>
       <div class="actions">
         <button id="myReservationsBtn" class="btn btn-blue">내 예약 보기</button>
@@ -47,6 +48,14 @@
     <main>
       <h2 id="roomTitle">시간표</h2>
       <table class="schedule" id="scheduleTable"></table>
+      <div id="monthView" style="display:none;">
+        <div class="month-nav">
+          <button id="prevMonth" class="btn-icon">←</button>
+          <span id="monthLabel"></span>
+          <button id="nextMonth" class="btn-icon">→</button>
+        </div>
+        <table class="month-table" id="monthTable"></table>
+      </div>
     </main>
   </div>
 
@@ -270,6 +279,6 @@
   <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ko.js"></script>
   <script src="config.js?v=2"></script>
   <script src="api.js?v=19"></script>
-  <script src="app.js?v=39"></script>
+  <script src="app.js?v=40"></script>
 </body>
 </html>
