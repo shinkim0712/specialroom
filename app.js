@@ -175,7 +175,7 @@ function addRoom() {
 function renderWeekSelect() {
   const sel = document.getElementById('weekSelect');
   sel.innerHTML = '';
-  const base = getMondayOf(new Date());
+  const base = state.weekStart;  // '오늘'이 아니라 '현재 보고 있는 주' 기준으로 만들어야 화살표로 멀리 이동해도 목록이 항상 현재 주를 포함함
   for (let i = -8; i <= 8; i++) {
     const w = addDays(base, i*7);
     const opt = document.createElement('option');
