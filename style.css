@@ -117,6 +117,8 @@ h2 { margin: 4px 0 12px; font-size: 18px; font-family: "Hanken Grotesk", "Noto S
 .schedule td.empty:hover { box-shadow: inset 0 0 0 1px #2c5282; cursor: pointer; }
 .schedule td.empty.holiday-cell { background: #f3f4f6; }
 .schedule td.empty.holiday-cell:hover { background: #e5e7eb; }
+.schedule td.empty.blocked-cell { background: repeating-linear-gradient(45deg, #fee2e2, #fee2e2 8px, #fecaca 8px, #fecaca 16px); }
+.schedule td.empty.blocked-cell:hover { filter: brightness(0.97); }
 .schedule td.reserved {
   background: rgba(190, 238, 205, 0.4);
   cursor: pointer;

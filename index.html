@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=Hanken+Grotesk:wght@600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=29" />
+  <link rel="stylesheet" href="style.css?v=30" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
   <style>
     .flatpickr-calendar { font-size: 16px !important; width: 380px !important; }
@@ -23,7 +23,8 @@
     <header class="top-bar">
       <div class="date-nav">
         <button id="prevWeek" class="btn-icon">←</button>
-        <select id="weekSelect"></select>
+        <button id="weekSelect" type="button"></button>
+        <input type="text" id="weekPicker" style="display:none">
         <button id="nextWeek" class="btn-icon">→</button>
         <button id="todayBtn" class="btn btn-dark">오늘</button>
       </div>
@@ -108,8 +109,11 @@
       <div id="drDays" class="period-checks"></div>
       <label>교시 (복수 선택 가능)</label>
       <div id="drPeriods" class="period-checks"></div>
+      <label class="period-check-item" style="margin-top:12px;">
+        <input type="checkbox" id="drBlock"> 이 기간엔 예약 금지 (라벨 대신 예약 자체를 막습니다)
+      </label>
       <label>라벨</label>
-      <input type="text" id="drLabel" placeholder="예: 학교 행사, 방과후 수업" />
+      <input type="text" id="drLabel" placeholder="예: 학교 행사, 방과후 수업 (예약 금지 시 사유)" />
       <div class="modal-actions">
         <button class="btn btn-gray" data-close>닫기</button>
         <button class="btn btn-blue" id="saveDateRuleBtn">추가</button>
@@ -266,6 +270,6 @@
   <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ko.js"></script>
   <script src="config.js?v=2"></script>
   <script src="api.js?v=19"></script>
-  <script src="app.js?v=36"></script>
+  <script src="app.js?v=38"></script>
 </body>
 </html>

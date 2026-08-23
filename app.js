@@ -200,17 +200,7 @@ function addRoom() {
 }
 
 function renderWeekSelect() {
-  const sel = document.getElementById('weekSelect');
-  sel.innerHTML = '';
-  const base = state.weekStart;  // '오늘'이 아니라 '현재 보고 있는 주' 기준으로 만들어야 화살표로 멀리 이동해도 목록이 항상 현재 주를 포함함
-  for (let i = -8; i <= 8; i++) {
-    const w = addDays(base, i*7);
-    const opt = document.createElement('option');
-    opt.value = w.toISOString();
-    opt.textContent = weekLabel(w);
-    if (w.getTime() === state.weekStart.getTime()) opt.selected = true;
-    sel.appendChild(opt);
-  }
+  document.getElementById('weekSelect').textContent = weekLabel(state.weekStart);
 }
 
 function renderSchedule() {
@@ -296,6 +286,8 @@ function makeCell(room, dateKey, periodKey, dayName) {
     td.className = 'empty';
     const holiday = getHolidayLabel(dateKey);
     if (holiday) td.classList.add('holiday-cell');
+    const blockedRule = dateRule && dateRule.blocked ? dateRule : null;
+    if (blockedRule) td.classList.add('blocked-cell');
     if (scheduleNote) {
       td.classList.add('has-schedule');
       td.innerHTML = `<span class="schedule-note">${escapeHtml(scheduleNote)}</span>`;
@@ -305,8 +297,16 @@ function makeCell(room, dateKey, periodKey, dayName) {
       if (state.selectedCells.some(c => c._key === key)) td.classList.add('selected');
     }
     td.onclick = () => {
+      if (!state.isAdmin && blockedRule && !state.multiSelect) {
+        alert(`예약이 금지된 시간입니다: ${blockedRule.label}`);
+        return;
+      }
       // 다중 선택 모드 (관리자/일반 공통)
       if (state.multiSelect) {
+        if (!state.isAdmin && blockedRule) {
+          alert(`예약이 금지된 시간입니다: ${blockedRule.label}`);
+          return;
+        }
         // 관리자: 요일+교시 기준 / 일반: 날짜+교시 기준
         const key = state.isAdmin
           ? `${room}|${dayName}|${periodKey}|empty`
@@ -628,9 +628,11 @@ document.getElementById('adminBtn').onclick = async () => {
 document.getElementById('prevWeek').onclick = () => { state.weekStart = addDays(state.weekStart, -7); renderWeekSelect(); renderSchedule(); };
 document.getElementById('nextWeek').onclick = () => { state.weekStart = addDays(state.weekStart, 7); renderWeekSelect(); renderSchedule(); };
 document.getElementById('todayBtn').onclick = () => { state.weekStart = getMondayOf(new Date()); renderWeekSelect(); renderSchedule(); };
-document.getElementById('weekSelect').onchange = (e) => {
-  state.weekStart = new Date(e.target.value);
-  renderSchedule();
+document.getElementById('weekSelect').onclick = () => {
+  const wp = document.getElementById('weekPicker');
+  if (fpWeek) fpWeek.open();
+  else if (wp.showPicker) wp.showPicker();
+  else wp.focus();
 };
 
 // ===== 서버 동기화 =====
@@ -975,17 +977,30 @@ document.querySelectorAll('.modal-backdrop').forEach(m => {
 
 // ===== flatpickr 초기화 =====
 // CDN 로드 실패(오프라인/차단) 시에도 앱이 뜨도록 방어. 실패하면 일반 날짜 입력창으로 대체.
-let fpStart = null, fpEnd = null, fpHolStart = null, fpHolEnd = null;
+let fpStart = null, fpEnd = null, fpHolStart = null, fpHolEnd = null, fpWeek = null;
 if (window.flatpickr) {
   fpStart = flatpickr('#drStart', { locale: 'ko', dateFormat: 'Y-m-d', disableMobile: true });
   fpEnd   = flatpickr('#drEnd',   { locale: 'ko', dateFormat: 'Y-m-d', disableMobile: true });
   fpHolStart = flatpickr('#holStart', { locale: 'ko', dateFormat: 'Y-m-d', disableMobile: true });
   fpHolEnd   = flatpickr('#holEnd',   { locale: 'ko', dateFormat: 'Y-m-d', disableMobile: true });
+  fpWeek = flatpickr('#weekPicker', {
+    locale: 'ko', dateFormat: 'Y-m-d', disableMobile: true,
+    onChange: (selectedDates) => {
+      if (!selectedDates.length) return;
+      state.weekStart = getMondayOf(selectedDates[0]);
+      renderWeekSelect();
+      renderSchedule();
+    },
+  });
 } else {
   document.getElementById('drStart').removeAttribute('readonly');
   document.getElementById('drEnd').removeAttribute('readonly');
   document.getElementById('holStart').removeAttribute('readonly');
   document.getElementById('holEnd').removeAttribute('readonly');
+  const wp = document.getElementById('weekPicker');
+  wp.type = 'date';
+  wp.style.display = '';
+  wp.onchange = () => { if (wp.value) { state.weekStart = getMondayOf(new Date(wp.value)); renderWeekSelect(); renderSchedule(); } };
 }
 
 // ===== 기간 정규시간 =====
@@ -1005,6 +1020,7 @@ document.getElementById('dateRuleBtn').onclick = () => {
   if (fpStart) fpStart.setDate(today, true); else document.getElementById('drStart').value = today;
   if (fpEnd)   fpEnd.setDate(today, true);   else document.getElementById('drEnd').value = today;
   document.getElementById('drLabel').value = '';
+  document.getElementById('drBlock').checked = false;
   renderDateRuleList();
   showModal('dateRuleModal');
 };
@@ -1017,7 +1033,7 @@ function renderDateRuleList() {
     ${state.dateRules.map(r => `
       <div class="date-rule-item">
         <div>
-          <strong>${escapeHtml(r.room)}</strong> · ${r.startDate} ~ ${r.endDate} · 매주 ${(r.daysOfWeek && r.daysOfWeek.length ? r.daysOfWeek.join(',') : '전체')}요일<br>
+          <strong>${escapeHtml(r.room)}</strong> · ${r.startDate} ~ ${r.endDate} · 매주 ${(r.daysOfWeek && r.daysOfWeek.length ? r.daysOfWeek.join(',') : '전체')}요일${r.blocked ? ' · <span style="color:#dc2626;">🚫 예약금지</span>' : ''}<br>
           <span style="font-size:12px; color:#555;">${r.periods.map(k => PERIODS.find(p=>p.key===k)?.label||k).join(', ')} · ${escapeHtml(r.label)}</span>
         </div>
         <button class="btn btn-red" style="font-size:12px; padding:4px 10px;" onclick="deleteDateRule('${r.id}')">삭제</button>
@@ -1031,10 +1047,18 @@ function deleteDateRule(id) {
   renderDateRuleList();
 }
 
-document.getElementById('saveDateRuleBtn').onclick = () => {
+// 요일이 학교 근무일(월~금) 밖이면 null — 주말 예약은 애초에 만들어지지 않지만 방어적으로 처리
+function dateToDayName(dateKey) {
+  const dow = new Date(dateKey + 'T00:00:00').getDay(); // 0=일 ~ 6=토
+  const idx = dow - 1; // 월=0
+  return (idx >= 0 && idx <= 4) ? DAYS[idx] : null;
+}
+
+document.getElementById('saveDateRuleBtn').onclick = async () => {
   const room = document.getElementById('drRoom').value;
   const startDate = document.getElementById('drStart').value;
   const endDate = document.getElementById('drEnd').value;
+  const blocked = document.getElementById('drBlock').checked;
   const label = document.getElementById('drLabel').value.trim();
   const periods = [...document.querySelectorAll('#drPeriods input:checked')].map(el => el.value);
   const daysOfWeek = [...document.querySelectorAll('#drDays input:checked')].map(el => el.value);
@@ -1043,7 +1067,28 @@ document.getElementById('saveDateRuleBtn').onclick = () => {
   if (!periods.length) { alert('교시를 하나 이상 선택하세요.'); return; }
   if (!daysOfWeek.length) { alert('요일을 하나 이상 선택하세요.'); return; }
   if (!label) { alert('라벨을 입력하세요.'); return; }
-  state.dateRules.push({ id: crypto.randomUUID(), room, startDate, endDate, periods, daysOfWeek, label });
+
+  if (blocked) {
+    const toCancel = state.reservations.filter(r =>
+      r.room === room && periods.includes(r.period) &&
+      r.date >= startDate && r.date <= endDate &&
+      daysOfWeek.includes(dateToDayName(r.date))
+    );
+    if (toCancel.length) {
+      const ids = new Set(toCancel.map(r => r.id));
+      state.reservations = state.reservations.filter(r => !ids.has(r.id));
+      if (API.enabled() && localStorage.getItem('autoSave') === '1') {
+        for (const r of toCancel) { try { await API.deleteReservation(r.id); } catch (e) { console.warn(e); } }
+      }
+      const list = toCancel
+        .sort((a, b) => a.date.localeCompare(b.date))
+        .map(r => `- ${r.date} ${periodLabel(r.period)} ${r.name}${r.classroom ? ' (' + r.classroom + ')' : ''} · ${r.purpose || ''}`)
+        .join('\n');
+      alert(`예약 금지 기간과 겹쳐서 아래 ${toCancel.length}건이 자동 취소되었습니다:\n\n${list}`);
+    }
+  }
+
+  state.dateRules.push({ id: crypto.randomUUID(), room, startDate, endDate, periods, daysOfWeek, label, blocked });
   saveState();
   render();
   renderDateRuleList();
