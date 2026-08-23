@@ -26,8 +26,9 @@ const API = {
   listRooms()              { return this._get('rooms'); },
   createReservation(r)     { return this._post('create', r); },
   updateReservation(r)     { return this._post('update', r); },
-  deleteReservation(id, pw){ return this._post('delete', { id, password: pw }); },
+  deleteReservation(id)    { return this._post('delete', { id }); },
   saveAll(data)            { return this._post('saveAll', data); },
   loadAll()                { return this._get('loadAll'); },
   cleanup(adminPw)         { return this._post('cleanup', { adminPw }); },
+  checkAdmin(pw)           { return this._post('checkAdmin', { pw }); },
 };

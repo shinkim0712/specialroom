@@ -4,7 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>특별실 예약 관리</title>
-  <link rel="stylesheet" href="style.css?v=20" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=Hanken+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=28" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
   <style>
     .flatpickr-calendar { font-size: 16px !important; width: 380px !important; }
@@ -28,7 +31,8 @@
         <button id="myReservationsBtn" class="btn btn-blue">내 예약 보기</button>
         <button id="multiSelectBtn" class="btn btn-dark">다중 선택</button>
         <button id="dateRuleBtn" class="btn btn-purple admin-only">기간 정규시간</button>
-        <button id="saveToServerBtn" class="btn btn-orange">서버로 저장</button>
+        <button id="holidayBtn" class="btn btn-purple admin-only">학교휴일 관리</button>
+        <button id="saveToServerBtn" class="btn btn-orange admin-only">정규시간표 서버저장</button>
         <button id="loadFromServerBtn" class="btn btn-teal">서버에서 불러오기</button>
         <button id="sheetSettingsBtn" class="btn btn-purple admin-only">구글시트 설정</button>
         <button id="adminBtn" class="btn btn-red">관리자 모드</button>
@@ -57,10 +61,16 @@
   <!-- 예약 입력 모달 -->
   <div class="modal-backdrop" id="reservationModal" hidden>
     <div class="modal">
-      <h3>예약하기</h3>
-      <label>예약자명</label>
+      <h3 id="reservationModalTitle">예약하기</h3>
+      <label style="display:flex; justify-content:space-between; align-items:center;">
+        예약자명
+        <a href="#" id="clearRememberedBtn" style="font-size:12px; font-weight:400; color:#888; text-decoration:underline;">자동입력 지우기</a>
+      </label>
       <input id="resName" type="text" />
       <label>학급</label>
+      <label style="display:flex; align-items:center; gap:6px; font-size:13px; margin:4px 0;">
+        <input type="checkbox" id="resMeetingMode" style="width:auto;"> 회의/학급
+      </label>
       <div style="display:flex; gap:8px;">
         <select id="resGrade" style="flex:1;">
           <option value="">학년 선택</option>
@@ -74,7 +84,7 @@
         </select>
       </div>
       <label>목적</label>
-      <input id="resPurpose" type="text" placeholder="예: 실험 수업" />
+      <input id="resPurpose" type="text" placeholder="예: 실험 수업, 교사 회의" />
       <div class="modal-actions">
         <button class="btn btn-gray" data-close>취소</button>
         <button class="btn btn-blue" id="saveReservationBtn">저장</button>
@@ -94,6 +104,8 @@
         <span>~</span>
         <input type="text" id="drEnd" class="flatpickr-input" placeholder="종료일" style="flex:1;" readonly>
       </div>
+      <label>요일 (기본 전체 — 특정 요일만 쓰려면 나머지 체크 해제)</label>
+      <div id="drDays" class="period-checks"></div>
       <label>교시 (복수 선택 가능)</label>
       <div id="drPeriods" class="period-checks"></div>
       <label>라벨</label>
@@ -103,6 +115,27 @@
         <button class="btn btn-blue" id="saveDateRuleBtn">추가</button>
       </div>
       <div id="dateRuleList"></div>
+    </div>
+  </div>
+
+  <!-- 학교자체 휴일 관리 모달 (관리자) -->
+  <div class="modal-backdrop" id="holidayModal" hidden>
+    <div class="modal modal-wide">
+      <h3>학교자체 휴일 관리</h3>
+      <p class="hint">공휴일은 자동으로 표시됩니다. 방학·재량휴업일·개교기념일 등 학교자체 휴일만 여기서 추가하세요.</p>
+      <label>기간 (하루만 쉬면 시작일·종료일을 같게)</label>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <input type="text" id="holStart" class="flatpickr-input" placeholder="시작일" style="flex:1;" readonly>
+        <span>~</span>
+        <input type="text" id="holEnd" class="flatpickr-input" placeholder="종료일" style="flex:1;" readonly>
+      </div>
+      <label>휴일 이름</label>
+      <input type="text" id="holLabel" placeholder="예: 여름방학, 재량휴업일" />
+      <div class="modal-actions">
+        <button class="btn btn-gray" data-close>닫기</button>
+        <button class="btn btn-blue" id="saveHolidayBtn">추가</button>
+      </div>
+      <div id="holidayList"></div>
     </div>
   </div>
 
@@ -229,21 +262,10 @@
     </div>
   </div>
 
-  <!-- 관리자: 정규시간표 편집 모달 -->
-  <div class="modal-backdrop" id="scheduleEditModal" hidden>
-    <div class="modal modal-wide">
-      <h3>정규 시간표 편집 (관리자)</h3>
-      <p class="hint">셀을 클릭해서 표시 텍스트를 입력하세요. 비우면 삭제됩니다.</p>
-      <div id="scheduleEditBody"></div>
-      <div class="modal-actions">
-        <button class="btn btn-gray" data-close>닫기</button>
-      </div>
-    </div>
-  </div>
-
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ko.js"></script>
-  <script src="api.js?v=16"></script>
-  <script src="app.js?v=16"></script>
+  <script src="config.js?v=2"></script>
+  <script src="api.js?v=19"></script>
+  <script src="app.js?v=33"></script>
 </body>
 </html>

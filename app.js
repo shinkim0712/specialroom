@@ -8,9 +8,42 @@ const PERIODS = [
   { key: '4E',  label: '4교시(2)', time: '12:20~13:00' },
   { key: '5EH', label: '5교시', time: '13:10~13:50' },
   { key: '6',   label: '6교시', time: '14:00~14:40' },
+  { key: '7',   label: '7교시', time: '14:50~15:30' },
+  { key: '8',   label: '8교시', time: '15:40~16:20' },
 ];
 const DAYS = ['월', '화', '수', '목', '금'];
-const ADMIN_PW_LOCAL = '1012';  // 데모용. 서버 연동 시 서버에서 검증
+
+// 대한민국 법정공휴일(2026). 제헌절은 국경일이지만 2008년부터 공휴일에서 제외되어 목록에 넣지 않음.
+// ▶ 다음 해가 되면 이 배열에 새 연도 항목을 추가하세요.
+const KR_HOLIDAYS = [
+  { date: '2026-01-01', label: '신정' },
+  { date: '2026-02-16', label: '설날연휴' },
+  { date: '2026-02-17', label: '설날' },
+  { date: '2026-02-18', label: '설날연휴' },
+  { date: '2026-03-01', label: '삼일절' },
+  { date: '2026-03-02', label: '대체공휴일' },
+  { date: '2026-05-05', label: '어린이날' },
+  { date: '2026-05-24', label: '부처님오신날' },
+  { date: '2026-05-25', label: '대체공휴일' },
+  { date: '2026-06-06', label: '현충일' },
+  { date: '2026-08-15', label: '광복절' },
+  { date: '2026-08-17', label: '대체공휴일' },
+  { date: '2026-09-24', label: '추석연휴' },
+  { date: '2026-09-25', label: '추석' },
+  { date: '2026-09-26', label: '추석연휴' },
+  { date: '2026-10-03', label: '개천절' },
+  { date: '2026-10-05', label: '대체공휴일' },
+  { date: '2026-10-09', label: '한글날' },
+  { date: '2026-12-25', label: '크리스마스' },
+];
+
+// 공휴일(고정) + 학교자체 휴일(관리자가 추가, 기간으로 등록) 중 해당 날짜의 라벨을 반환
+function getHolidayLabel(dateKey) {
+  const custom = state.customHolidays.find(h => dateKey >= h.startDate && dateKey <= h.endDate);
+  if (custom) return custom.label;
+  const kr = KR_HOLIDAYS.find(h => h.date === dateKey);
+  return kr ? kr.label : null;
+}
 
 // ===== 상태 =====
 const state = {
@@ -18,6 +51,7 @@ const state = {
   reservations: load('reservations', []),  // {id, room, date, period, name, classroom, purpose, createdAt}
   schedule: load('schedule', []),          // {room, dayOfWeek, period, label}
   dateRules: load('dateRules', []),        // {id, room, startDate, endDate, periods:[], label}
+  customHolidays: load('customHolidays', []),  // {id, startDate, endDate, label} — 방학·재량휴업일 등 학교자체 휴일
   currentRoom: null,
   weekStart: getMondayOf(new Date()),
   isAdmin: sessionStorage.getItem('isAdmin') === '1',
@@ -37,6 +71,8 @@ function saveState() {
   save('rooms', state.rooms);
   save('reservations', state.reservations);
   save('schedule', state.schedule);
+  save('dateRules', state.dateRules);
+  save('customHolidays', state.customHolidays);
 }
 
 // ===== 날짜 유틸 =====
@@ -57,12 +93,6 @@ function fmtDateKey(d) {
 function weekLabel(start) {
   const end = addDays(start, 4);
   return `${start.getFullYear()}년 ${start.getMonth()+1}.${start.getDate()}~${end.getMonth()+1}.${end.getDate()}`;
-}
-
-// ===== 해시 (브라우저 SubtleCrypto) =====
-async function sha256(text) {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
 }
 
 // ===== 렌더링 =====
@@ -88,11 +118,13 @@ function renderTabs() {
     }
     nav.appendChild(b);
   });
-  const add = document.createElement('button');
-  add.className = 'tab add-tab';
-  add.textContent = '+ 특별실 추가';
-  add.onclick = addRoom;
-  nav.appendChild(add);
+  if (state.isAdmin) {
+    const add = document.createElement('button');
+    add.className = 'tab add-tab';
+    add.textContent = '+ 특별실 추가';
+    add.onclick = addRoom;
+    nav.appendChild(add);
+  }
 }
 
 function addRoom() {
@@ -127,9 +159,12 @@ function renderSchedule() {
   // 헤더
   const thead = document.createElement('thead');
   const headRow = document.createElement('tr');
-  headRow.innerHTML = '<th>교시/시간</th>' + DAYS.map((d, i) => {
+  headRow.innerHTML = '<th>교시</th>' + DAYS.map((d, i) => {
     const day = addDays(state.weekStart, i);
-    return `<th>${d} (${fmtDate(day)})</th>`;
+    const dateKey = fmtDateKey(day);
+    const holiday = getHolidayLabel(dateKey);
+    const holidayHtml = holiday ? `<span class="th-holiday">${escapeHtml(holiday)}</span>` : '';
+    return `<th class="${holiday ? 'holiday' : ''}"><span class="th-day">${d}</span><span class="th-date">${day.getMonth()+1}.${day.getDate()}</span>${holidayHtml}</th>`;
   }).join('');
   thead.appendChild(headRow);
   table.appendChild(thead);
@@ -142,25 +177,15 @@ function renderSchedule() {
     td.innerHTML = `${p.label}<span class="period-time">${p.time}</span>`;
     tr.appendChild(td);
 
-    if (p.lunch) {
-      for (let i = 0; i < 5; i++) tr.appendChild(emptyLunchCell());
-    } else {
-      DAYS.forEach((dayName, i) => {
-        const dateObj = addDays(state.weekStart, i);
-        const dateKey = fmtDateKey(dateObj);
-        const cell = makeCell(state.currentRoom, dateKey, p.key, dayName);
-        tr.appendChild(cell);
-      });
-    }
+    DAYS.forEach((dayName, i) => {
+      const dateObj = addDays(state.weekStart, i);
+      const dateKey = fmtDateKey(dateObj);
+      const cell = makeCell(state.currentRoom, dateKey, p.key, dayName);
+      tr.appendChild(cell);
+    });
     tbody.appendChild(tr);
   });
   table.appendChild(tbody);
-}
-
-function emptyLunchCell() {
-  const td = document.createElement('td');
-  td.className = 'lunch-row';
-  return td;
 }
 
 function makeCell(room, dateKey, periodKey, dayName) {
@@ -171,7 +196,8 @@ function makeCell(room, dateKey, periodKey, dayName) {
   const sch = state.schedule.find(s => s.room === room && s.dayOfWeek === dayName && s.period === periodKey);
   const matchingRules = state.dateRules.filter(r =>
     r.room === room && r.periods.includes(periodKey) &&
-    dateKey >= r.startDate && dateKey <= r.endDate
+    dateKey >= r.startDate && dateKey <= r.endDate &&
+    (!r.daysOfWeek || !r.daysOfWeek.length || r.daysOfWeek.includes(dayName))
   );
   const dateRule = matchingRules.length ? matchingRules[matchingRules.length - 1] : null;
   const scheduleNote = dateRule ? dateRule.label : (sch ? sch.label : null);
@@ -179,33 +205,58 @@ function makeCell(room, dateKey, periodKey, dayName) {
     td.className = 'reserved';
     const noteHtml = scheduleNote ? `<span class="schedule-note">${escapeHtml(scheduleNote)}</span>` : '';
     td.innerHTML = `
-      <div><span class="star">★</span> <span class="name">${escapeHtml(reservation.name)}</span></div>
-      <div class="meta">${escapeHtml(reservation.classroom || '')}</div>
-      <div class="meta">${escapeHtml(reservation.purpose || '')}</div>
+      <div><span class="star">📌</span> <span class="name">${escapeHtml(reservation.name)}</span></div>
+      <div class="meta meta-class">${escapeHtml(reservation.classroom || '')}</div>
+      <div class="meta meta-purpose">${escapeHtml(reservation.purpose || '')}</div>
       ${noteHtml}
     `;
-    td.onclick = () => openDetail(reservation, { room, dayName, periodKey, sch });
+    if (state.multiSelect && state.selectedCells.some(c => c._key === `${room}|${dateKey}|${periodKey}|res`)) {
+      td.classList.add('selected');
+    }
+    td.onclick = () => {
+      // 다중 선택 모드: 예약된 칸은 일괄 삭제 대상으로 선택
+      if (state.multiSelect) {
+        const key = `${room}|${dateKey}|${periodKey}|res`;
+        const idx = state.selectedCells.findIndex(c => c._key === key);
+        if (idx >= 0) {
+          state.selectedCells.splice(idx, 1);
+          td.classList.remove('selected');
+        } else {
+          state.selectedCells.push({ _key: key, kind: 'reservation', reservationId: reservation.id, room, date: dateKey, period: periodKey });
+          td.classList.add('selected');
+        }
+        updateMultiBar();
+        return;
+      }
+      openDetail(reservation, { room, dayName, periodKey, sch });
+    };
   } else {
     td.className = 'empty';
+    const holiday = getHolidayLabel(dateKey);
+    if (holiday) td.classList.add('holiday-cell');
     if (scheduleNote) {
       td.classList.add('has-schedule');
       td.innerHTML = `<span class="schedule-note">${escapeHtml(scheduleNote)}</span>`;
+    }
+    if (state.multiSelect) {
+      const key = state.isAdmin ? `${room}|${dayName}|${periodKey}|empty` : `${room}|${dateKey}|${periodKey}|empty`;
+      if (state.selectedCells.some(c => c._key === key)) td.classList.add('selected');
     }
     td.onclick = () => {
       // 다중 선택 모드 (관리자/일반 공통)
       if (state.multiSelect) {
         // 관리자: 요일+교시 기준 / 일반: 날짜+교시 기준
         const key = state.isAdmin
-          ? `${room}|${dayName}|${periodKey}`
-          : `${room}|${dateKey}|${periodKey}`;
+          ? `${room}|${dayName}|${periodKey}|empty`
+          : `${room}|${dateKey}|${periodKey}|empty`;
         const idx = state.selectedCells.findIndex(c => c._key === key);
         if (idx >= 0) {
           state.selectedCells.splice(idx, 1);
           td.classList.remove('selected');
         } else {
           const cell = state.isAdmin
-            ? { _key: key, room, dayName, period: periodKey, sch: sch || null }
-            : { _key: key, room, date: dateKey, period: periodKey };
+            ? { _key: key, kind: 'empty', room, dayName, period: periodKey, sch: sch || null }
+            : { _key: key, kind: 'empty', room, date: dateKey, period: periodKey };
           state.selectedCells.push(cell);
           td.classList.add('selected');
         }
@@ -216,7 +267,7 @@ function makeCell(room, dateKey, periodKey, dayName) {
         editScheduleLabel(room, dayName, periodKey, sch || null);
         return;
       }
-      openReservation(room, dateKey, periodKey);
+      openReservation(room, dateKey, periodKey, scheduleNote);
     };
   }
   return td;
@@ -227,22 +278,89 @@ function escapeHtml(s) {
 }
 
 // ===== 예약 흐름 =====
-function openReservation(room, date, period) {
-  state.pendingCell = { room, date, period };
+// 예약자명/학급은 이 브라우저에서 마지막으로 쓴 값을 기억해뒀다가 다음 예약에 기본값으로 채움.
+// 정규시간표 라벨이 "N학년" 형태로 정확히 일치하면 그걸 우선 채움(예: 강당은 항상 3학년이 씀).
+function prefillNameAndClassroom(scheduleNote) {
+  document.getElementById('resName').value = localStorage.getItem('lastResName') || '';
+  const gradeMatch = scheduleNote && /^[1-6]학년$/.test(scheduleNote);
+  document.getElementById('resGrade').value = gradeMatch ? scheduleNote : (localStorage.getItem('lastResGrade') || '');
+  document.getElementById('resClassNum').value = gradeMatch ? '' : (localStorage.getItem('lastResClassNum') || '');
+}
+
+// 관리자 권한 없이 누구나 자기 브라우저의 "마지막 입력값 기억"만 지울 수 있는 버튼
+document.getElementById('clearRememberedBtn').onclick = (e) => {
+  e.preventDefault();
+  localStorage.removeItem('lastResName');
+  localStorage.removeItem('lastResGrade');
+  localStorage.removeItem('lastResClassNum');
   document.getElementById('resName').value = '';
   document.getElementById('resGrade').value = '';
   document.getElementById('resClassNum').value = '';
+};
+
+let _editingReservationId = null;
+
+function openReservation(room, date, period, scheduleNote) {
+  _editingReservationId = null;
+  document.getElementById('reservationModalTitle').textContent = '예약하기';
+  state.pendingCell = { room, date, period };
+  prefillNameAndClassroom(scheduleNote);
+  document.getElementById('resMeetingMode').checked = false;
   document.getElementById('resPurpose').value = '';
+  showModal('reservationModal');
+}
+
+// 예약 수정: 새 예약과 같은 입력 폼을 재사용해 기존 값을 채워서 엶
+function openEditReservation(r) {
+  _editingReservationId = r.id;
+  document.getElementById('reservationModalTitle').textContent = '예약 수정';
+  document.getElementById('resName').value = r.name || '';
+  const isMeetingClassroom = r.classroom === '회의/학급';
+  document.getElementById('resMeetingMode').checked = isMeetingClassroom;
+  if (!isMeetingClassroom && r.classroom) {
+    const m = r.classroom.match(/^([1-6]학년)(?:\s+(\d+반))?$/);
+    document.getElementById('resGrade').value = m ? m[1] : '';
+    document.getElementById('resClassNum').value = (m && m[2]) ? m[2] : '';
+  } else {
+    document.getElementById('resGrade').value = '';
+    document.getElementById('resClassNum').value = '';
+  }
+  document.getElementById('resPurpose').value = r.purpose || '';
   showModal('reservationModal');
 }
 
 document.getElementById('saveReservationBtn').onclick = async () => {
   const name = document.getElementById('resName').value.trim();
+  const isMeeting = document.getElementById('resMeetingMode').checked;
   const grade = document.getElementById('resGrade').value;
   const classNum = document.getElementById('resClassNum').value;
-  const classroom = (grade && classNum) ? `${grade} ${classNum}` : (grade || classNum);
+  const classroom = isMeeting ? '회의/학급' : ((grade && classNum) ? `${grade} ${classNum}` : (grade || classNum));
   const purpose = document.getElementById('resPurpose').value.trim();
   if (!name) { alert('예약자명을 입력하세요.'); return; }
+
+  // 다음 예약 때 기본값으로 쓰기 위해 기억 (회의 체크 시엔 학급을 안 쓴 것이므로 기억값에 반영하지 않음)
+  localStorage.setItem('lastResName', name);
+  if (!isMeeting) {
+    if (grade) localStorage.setItem('lastResGrade', grade);
+    if (classNum) localStorage.setItem('lastResClassNum', classNum);
+  }
+
+  // 예약 수정 모드: 기존 예약을 갱신 (새 예약 생성 로직과 분리)
+  if (_editingReservationId) {
+    const editedId = _editingReservationId;
+    const r = state.reservations.find(x => x.id === editedId);
+    _editingReservationId = null;
+    if (r) {
+      r.name = name; r.classroom = classroom; r.purpose = purpose;
+      saveState();
+    }
+    closeAllModals();
+    render();
+    if (r && API.enabled() && localStorage.getItem('autoSave') === '1') {
+      try { await API.updateReservation({ id: editedId, name, classroom, purpose }); } catch (e) { console.warn(e); }
+    }
+    return;
+  }
 
   const cells = state.pendingBatch || (state.pendingCell ? [state.pendingCell] : []);
   const newReservations = cells.map(cell => ({
@@ -258,8 +376,22 @@ document.getElementById('saveReservationBtn').onclick = async () => {
   exitMultiSelect();
 
   if (API.enabled() && localStorage.getItem('autoSave') === '1') {
+    // 서버가 거부한(이미 예약된) 칸은 화면에서 되돌리고 알림 — 겹치기 예약 방지
+    const rejected = [];
     for (const r of newReservations) {
-      try { await API.createReservation(r); } catch (e) { console.warn(e); }
+      try {
+        const result = await API.createReservation(r);
+        if (!result.ok) {
+          state.reservations = state.reservations.filter(x => x.id !== r.id);
+          rejected.push(r);
+        }
+      } catch (e) { console.warn(e); }
+    }
+    if (rejected.length) {
+      saveState();
+      render();
+      const list = rejected.map(r => `${r.room} ${r.date} ${periodLabel(r.period)}`).join('\n');
+      alert(`다른 사람이 먼저 예약해서 아래 시간은 취소되었습니다:\n${list}`);
     }
   }
 };
@@ -302,20 +434,16 @@ document.getElementById('deleteResBtn').onclick = async () => {
   closeAllModals();
   render();
   if (API.enabled() && localStorage.getItem('autoSave') === '1') {
-    try { await API.deleteReservation(id, ADMIN_PW_LOCAL); } catch (e) { console.warn(e); }
+    try { await API.deleteReservation(id); } catch (e) { console.warn(e); }
   }
 };
 
-document.getElementById('editResBtn').onclick = async () => {
+document.getElementById('editResBtn').onclick = () => {
   const id = document.getElementById('detailModal').dataset.id;
   const r = state.reservations.find(x => x.id === id);
   if (!r) return;
-  const newPurpose = prompt('목적을 수정하세요:', r.purpose || '');
-  if (newPurpose === null) return;
-  r.purpose = newPurpose.trim();
-  saveState();
   closeAllModals();
-  render();
+  openEditReservation(r);
 };
 
 // ===== 내 예약 보기 =====
@@ -374,24 +502,63 @@ document.getElementById('scheduleLabelSaveBtn').onclick = () => {
 };
 
 // ===== 관리자 모드 =====
-document.getElementById('adminBtn').onclick = () => {
+// 비밀번호는 서버(Apps Script)에서만 검증 — 브라우저 코드에 남기지 않음
+function updateAdminBtnLabel() {
+  document.getElementById('adminBtn').textContent = state.isAdmin ? '사용자 모드로 전환' : '관리자 모드';
+}
+
+const ADMIN_HELP_TEXT = `관리자 모드 활성화
+
+[정규시간표 관리]
+- 빈 셀 클릭 → 정규시간 라벨 추가/편집 (매주 반복되는 요일·교시 기준)
+- 기간 정규시간 버튼 → 날짜 범위로 여러 날에 한 번에 라벨 설정
+- 다중 선택 → 빈 셀 여러 개를 골라 한 번에 라벨 설정/삭제
+
+[특별실 관리] (추가·삭제 모두 관리자만 가능)
+- + 특별실 추가 버튼으로 새 특별실 추가
+- 탭 우클릭 → 특별실 삭제
+
+[학교휴일 관리]
+- 학교휴일 관리 버튼 → 방학·재량휴업일·개교기념일 등 학교자체 휴일 등록/삭제
+  (법정공휴일은 별도 설정 없이 자동으로 표시됨)
+
+[예약 관리]
+- 예약 삭제·수정에는 비밀번호 확인이 없습니다 (관리자든 일반 사용자든 동일)
+- 다중 선택으로 예약된 칸 여러 개를 골라 한 번에 삭제 가능
+
+[서버]
+- 구글시트 설정에서 Apps Script 연동 관리
+- 정규시간표 서버저장 버튼으로 정규시간표·특별실·학교휴일을 구글시트에 저장 (예약은 자동 저장됨)`;
+
+document.getElementById('adminBtn').onclick = async () => {
   if (state.isAdmin) {
     state.isAdmin = false;
     sessionStorage.removeItem('isAdmin');
     document.body.classList.remove('admin');
-    alert('관리자 모드 해제 — 사용자 화면으로 돌아갑니다.');
+    updateAdminBtnLabel();
+    if (state.multiSelect) exitMultiSelect();  // 관리자/사용자 모드는 다중선택 키 기준이 달라 전환 시 선택 초기화
+    alert('사용자 모드로 전환 — 관리자 기능이 화면에서 사라집니다.');
     render();
     return;
   }
+  if (!API.enabled()) { alert('서버 연동이 꺼져 있어 관리자 인증을 할 수 없습니다. 구글시트 설정에서 활성화하세요.'); return; }
   const pw = prompt('관리자 비밀번호:');
-  if (pw === ADMIN_PW_LOCAL) {
-    state.isAdmin = true;
-    sessionStorage.setItem('isAdmin', '1');
-    document.body.classList.add('admin');
-    alert('관리자 모드 활성화\n\n[정규시간 관리]\n- 빈 셀 클릭 → 정규시간 추가/편집\n- 기간 정규시간 버튼 → 날짜 범위로 일괄 설정\n- 다중 선택 → 여러 셀 한번에 설정\n\n[특별실 관리]\n- 탭 우클릭 → 특별실 삭제\n- + 특별실 추가 버튼으로 추가 가능\n\n[서버]\n- 구글시트 설정에서 연동 관리');
-    render();
-  } else {
-    alert('비밀번호가 틀립니다.');
+  if (pw === null) return;
+  try {
+    const r = await API.checkAdmin(pw);
+    if (r.ok) {
+      state.isAdmin = true;
+      sessionStorage.setItem('isAdmin', '1');
+      document.body.classList.add('admin');
+      updateAdminBtnLabel();
+      if (state.multiSelect) exitMultiSelect();
+      alert(ADMIN_HELP_TEXT);
+      render();
+    } else {
+      alert('비밀번호가 틀립니다.');
+    }
+  } catch (e) {
+    alert('서버 연결 오류: ' + e.message);
   }
 };
 
@@ -408,12 +575,14 @@ document.getElementById('weekSelect').onchange = (e) => {
 document.getElementById('saveToServerBtn').onclick = async () => {
   if (!API.enabled()) { alert('서버 연동이 비활성화되어 있습니다. 구글시트 설정에서 활성화하세요.'); return; }
   try {
+    // 예약은 자동저장이 관리하므로 여기선 정규시간표·특별실·기간정규시간·학교휴일만 저장(예약 덮어쓰기 방지)
     const result = await API.saveAll({
       rooms: state.rooms,
-      reservations: state.reservations,
       schedule: state.schedule,
+      dateRules: state.dateRules,
+      holidays: state.customHolidays,
     });
-    alert(result.ok ? '서버에 저장되었습니다.' : '저장 실패: ' + (result.error || ''));
+    alert(result.ok ? '정규시간표·특별실·학교휴일 설정을 서버에 저장했습니다.' : '저장 실패: ' + (result.error || ''));
   } catch (e) { alert('오류: ' + e.message); }
 };
 
@@ -443,7 +612,7 @@ function normalizeDateStr(v) {
   return v;
 }
 
-async function loadFromServer({ force = false } = {}) {
+async function loadFromServer({ force = false, includeSettings = false } = {}) {
   try {
     const data = await API.loadAll();
     if (Array.isArray(data.reservations)) {
@@ -453,13 +622,28 @@ async function loadFromServer({ force = false } = {}) {
         period: String(r.period),
       }));
     }
-    if (Array.isArray(data.reservations) && (force || data.reservations.length > 0)) {
-      state.reservations = data.reservations;
+    if (Array.isArray(data.reservations)) {
+      if (force) {
+        state.reservations = data.reservations;
+      } else {
+        // 자동 불러오기: 서버에 아직 없는 로컬 전용 예약은 보존
+        const serverIds = new Set(data.reservations.map(r => r.id));
+        const localOnly = state.reservations.filter(r => !serverIds.has(r.id));
+        state.reservations = [...data.reservations, ...localOnly];
+      }
     }
-    // 방 목록·정규시간표는 force(명시적 불러오기)일 때만 덮어씀
-    if (force) {
+    // 방 목록·정규시간표·기간정규시간·학교휴일은 force(명시적 불러오기) 또는 사용자 모드 자동갱신일 때만 덮어씀
+    if (force || includeSettings) {
       if (Array.isArray(data.rooms) && data.rooms.length > 0) state.rooms = data.rooms;
       if (Array.isArray(data.schedule)) state.schedule = data.schedule;
+      if (Array.isArray(data.dateRules)) {
+        state.dateRules = data.dateRules.map(r => ({
+          ...r,
+          periods: Array.isArray(r.periods) ? r.periods : JSON.parse(r.periods || '[]'),
+          daysOfWeek: Array.isArray(r.daysOfWeek) ? r.daysOfWeek : JSON.parse(r.daysOfWeek || '[]'),
+        }));
+      }
+      if (Array.isArray(data.holidays)) state.customHolidays = data.holidays;
     }
     saveState();
     render();
@@ -478,6 +662,8 @@ const HEADERS = {
   reservations: ['id', 'room', 'date', 'period', 'name', 'classroom', 'purpose', 'passwordHash', 'createdAt'],
   rooms: ['name', 'order'],
   schedule: ['room', 'dayOfWeek', 'period', 'label'],
+  dateRules: ['id', 'room', 'startDate', 'endDate', 'periods', 'daysOfWeek', 'label'],
+  holidays: ['id', 'startDate', 'endDate', 'label'],
 };
 
 function doGet(e) {
@@ -491,6 +677,8 @@ function doGet(e) {
       rooms: readSheet('rooms').sort((a,b)=>(a.order||0)-(b.order||0)).map(r => r.name),
       reservations: readSheet('reservations'),
       schedule: readSheet('schedule'),
+      dateRules: readSheet('dateRules'),
+      holidays: readSheet('holidays'),
     });
     return json({ error: 'unknown action: ' + action });
   } catch (err) { return json({ error: String(err) }); }
@@ -506,24 +694,35 @@ function doPost(e) {
     if (action === 'delete')  return json(deleteReservation(body));
     if (action === 'saveAll') return json(saveAll(body));
     if (action === 'cleanup') return json(cleanup(body));
+    if (action === 'checkAdmin') return json(checkAdmin(body));
     return json({ error: 'unknown action: ' + action });
   } catch (err) { return json({ error: String(err) }); }
 }
 
+function checkAdmin(body) {
+  return { ok: body.pw === ADMIN_PW };
+}
+
 function createReservation(body) {
-  const sheet = sheetOf('reservations');
-  const all = readSheet('reservations');
-  if (all.some(r => r.room === body.room && r.date === body.date && r.period === body.period)) {
-    return { ok: false, error: 'already reserved' };
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const all = readSheet('reservations');
+    if (all.some(r => r.room === body.room && r.date === body.date && r.period === body.period)) {
+      return { ok: false, error: 'already reserved' };
+    }
+    const sheet = sheetOf('reservations');
+    sheet.appendRow([
+      body.id || Utilities.getUuid(),
+      body.room, body.date, body.period,
+      body.name, body.classroom || '', body.purpose || '',
+      body.passwordHash || '',
+      body.createdAt || new Date().toISOString(),
+    ]);
+    return { ok: true, id: body.id };
+  } finally {
+    lock.releaseLock();
   }
-  sheet.appendRow([
-    body.id || Utilities.getUuid(),
-    body.room, body.date, body.period,
-    body.name, body.classroom || '', body.purpose || '',
-    body.passwordHash || '',
-    body.createdAt || new Date().toISOString(),
-  ]);
-  return { ok: true, id: body.id };
 }
 
 function updateReservation(body) {
@@ -531,10 +730,8 @@ function updateReservation(body) {
   const data = sheet.getDataRange().getValues();
   const headers = data[0];
   const idCol = headers.indexOf('id');
-  const pwCol = headers.indexOf('passwordHash');
   for (let i = 1; i < data.length; i++) {
     if (data[i][idCol] === body.id) {
-      if (!isAuthorized(body, data[i][pwCol])) return { ok: false, error: 'unauthorized' };
       ['room','date','period','name','classroom','purpose'].forEach(k => {
         if (body[k] !== undefined) {
           const col = headers.indexOf(k);
@@ -550,12 +747,9 @@ function updateReservation(body) {
 function deleteReservation(body) {
   const sheet = sheetOf('reservations');
   const data = sheet.getDataRange().getValues();
-  const headers = data[0];
-  const idCol = headers.indexOf('id');
-  const pwCol = headers.indexOf('passwordHash');
+  const idCol = data[0].indexOf('id');
   for (let i = 1; i < data.length; i++) {
     if (data[i][idCol] === body.id) {
-      if (!isAuthorized(body, data[i][pwCol])) return { ok: false, error: 'unauthorized' };
       sheet.deleteRow(i+1);
       return { ok: true };
     }
@@ -567,6 +761,12 @@ function saveAll(body) {
   if (body.rooms)        writeSheet('rooms', body.rooms.map((name, i) => ({ name, order: i })));
   if (body.reservations) writeSheet('reservations', body.reservations);
   if (body.schedule)     writeSheet('schedule', body.schedule);
+  if (body.dateRules)    writeSheet('dateRules', body.dateRules.map(r => ({
+    ...r,
+    periods: JSON.stringify(r.periods || []),
+    daysOfWeek: JSON.stringify(r.daysOfWeek || []),
+  })));
+  if (body.holidays)     writeSheet('holidays', body.holidays);
   return { ok: true };
 }
 
@@ -599,13 +799,17 @@ function readSheet(name) {
 }
 
 function normalizeCell(header, value) {
-  if (header === 'date' && value instanceof Date)
+  const isDateCol = header === 'date' || header === 'startDate' || header === 'endDate';
+  if (isDateCol && value instanceof Date)
     return Utilities.formatDate(value, 'Asia/Seoul', 'yyyy-MM-dd');
-  if (header === 'date' && typeof value === 'string' && value.indexOf('T') > 0) {
+  if (isDateCol && typeof value === 'string' && value.indexOf('T') > 0) {
     const d = new Date(value);
     return Utilities.formatDate(d, 'Asia/Seoul', 'yyyy-MM-dd');
   }
   if (header === 'period') return String(value);
+  if ((header === 'periods' || header === 'daysOfWeek') && typeof value === 'string') {
+    try { return JSON.parse(value); } catch (e) { return []; }
+  }
   return value;
 }
 
@@ -617,12 +821,6 @@ function writeSheet(name, rows) {
   if (!rows.length) return;
   const matrix = rows.map(r => headers.map(h => r[h] !== undefined ? r[h] : ''));
   sheet.getRange(2, 1, matrix.length, headers.length).setValues(matrix);
-}
-
-function isAuthorized(body, storedHash) {
-  if (body.adminPw === ADMIN_PW) return true;
-  if (body.passwordHash && body.passwordHash === storedHash) return true;
-  return false;
 }
 
 function json(obj) {
@@ -696,7 +894,10 @@ function setupAutoLoad() {
   if (state.autoLoadTimer) clearInterval(state.autoLoadTimer);
   if (API.enabled() && localStorage.getItem('autoLoad') === '1') {
     const sec = parseInt(localStorage.getItem('autoLoadInterval') || '600', 10);
-    state.autoLoadTimer = setInterval(loadFromServer, sec * 1000);
+    state.autoLoadTimer = setInterval(() => {
+      if (state.isAdmin) return;  // 관리자 모드에서는 편집 중 화면이 바뀌지 않도록 자동 갱신 정지
+      loadFromServer({ includeSettings: true });
+    }, sec * 1000);
   }
 }
 
@@ -711,8 +912,19 @@ document.querySelectorAll('.modal-backdrop').forEach(m => {
 });
 
 // ===== flatpickr 초기화 =====
-const fpStart = flatpickr('#drStart', { locale: 'ko', dateFormat: 'Y-m-d', disableMobile: true });
-const fpEnd   = flatpickr('#drEnd',   { locale: 'ko', dateFormat: 'Y-m-d', disableMobile: true });
+// CDN 로드 실패(오프라인/차단) 시에도 앱이 뜨도록 방어. 실패하면 일반 날짜 입력창으로 대체.
+let fpStart = null, fpEnd = null, fpHolStart = null, fpHolEnd = null;
+if (window.flatpickr) {
+  fpStart = flatpickr('#drStart', { locale: 'ko', dateFormat: 'Y-m-d', disableMobile: true });
+  fpEnd   = flatpickr('#drEnd',   { locale: 'ko', dateFormat: 'Y-m-d', disableMobile: true });
+  fpHolStart = flatpickr('#holStart', { locale: 'ko', dateFormat: 'Y-m-d', disableMobile: true });
+  fpHolEnd   = flatpickr('#holEnd',   { locale: 'ko', dateFormat: 'Y-m-d', disableMobile: true });
+} else {
+  document.getElementById('drStart').removeAttribute('readonly');
+  document.getElementById('drEnd').removeAttribute('readonly');
+  document.getElementById('holStart').removeAttribute('readonly');
+  document.getElementById('holEnd').removeAttribute('readonly');
+}
 
 // ===== 기간 정규시간 =====
 document.getElementById('dateRuleBtn').onclick = () => {
@@ -722,9 +934,14 @@ document.getElementById('dateRuleBtn').onclick = () => {
     <label class="period-check-item">
       <input type="checkbox" value="${p.key}"> ${p.label}
     </label>`).join('');
+  // 요일은 기본 전체 체크 — 특정 요일만 쓰려면 나머지를 체크 해제
+  document.getElementById('drDays').innerHTML = DAYS.map(d => `
+    <label class="period-check-item">
+      <input type="checkbox" value="${d}" checked> ${d}
+    </label>`).join('');
   const today = new Date().toISOString().slice(0, 10);
-  fpStart.setDate(today, true);
-  fpEnd.setDate(today, true);
+  if (fpStart) fpStart.setDate(today, true); else document.getElementById('drStart').value = today;
+  if (fpEnd)   fpEnd.setDate(today, true);   else document.getElementById('drEnd').value = today;
   document.getElementById('drLabel').value = '';
   renderDateRuleList();
   showModal('dateRuleModal');
@@ -738,7 +955,7 @@ function renderDateRuleList() {
     ${state.dateRules.map(r => `
       <div class="date-rule-item">
         <div>
-          <strong>${escapeHtml(r.room)}</strong> · ${r.startDate} ~ ${r.endDate}<br>
+          <strong>${escapeHtml(r.room)}</strong> · ${r.startDate} ~ ${r.endDate} · 매주 ${(r.daysOfWeek && r.daysOfWeek.length ? r.daysOfWeek.join(',') : '전체')}요일<br>
           <span style="font-size:12px; color:#555;">${r.periods.map(k => PERIODS.find(p=>p.key===k)?.label||k).join(', ')} · ${escapeHtml(r.label)}</span>
         </div>
         <button class="btn btn-red" style="font-size:12px; padding:4px 10px;" onclick="deleteDateRule('${r.id}')">삭제</button>
@@ -758,24 +975,72 @@ document.getElementById('saveDateRuleBtn').onclick = () => {
   const endDate = document.getElementById('drEnd').value;
   const label = document.getElementById('drLabel').value.trim();
   const periods = [...document.querySelectorAll('#drPeriods input:checked')].map(el => el.value);
+  const daysOfWeek = [...document.querySelectorAll('#drDays input:checked')].map(el => el.value);
   if (!startDate || !endDate) { alert('기간을 입력하세요.'); return; }
   if (startDate > endDate) { alert('시작일이 종료일보다 늦습니다.'); return; }
   if (!periods.length) { alert('교시를 하나 이상 선택하세요.'); return; }
+  if (!daysOfWeek.length) { alert('요일을 하나 이상 선택하세요.'); return; }
   if (!label) { alert('라벨을 입력하세요.'); return; }
-  state.dateRules.push({ id: crypto.randomUUID(), room, startDate, endDate, periods, label });
+  state.dateRules.push({ id: crypto.randomUUID(), room, startDate, endDate, periods, daysOfWeek, label });
   saveState();
   render();
   renderDateRuleList();
 };
 
+// ===== 학교자체 휴일 관리 (관리자) =====
+document.getElementById('holidayBtn').onclick = () => {
+  const today = new Date().toISOString().slice(0, 10);
+  if (fpHolStart) fpHolStart.setDate(today, true); else document.getElementById('holStart').value = today;
+  if (fpHolEnd)   fpHolEnd.setDate(today, true);   else document.getElementById('holEnd').value = today;
+  document.getElementById('holLabel').value = '';
+  renderHolidayList();
+  showModal('holidayModal');
+};
+
+function renderHolidayList() {
+  const list = document.getElementById('holidayList');
+  if (!state.customHolidays.length) { list.innerHTML = '<p style="font-size:13px; color:#888;">등록된 학교자체 휴일이 없습니다.</p>'; return; }
+  const sorted = [...state.customHolidays].sort((a, b) => a.startDate.localeCompare(b.startDate));
+  list.innerHTML = sorted.map(h => `
+    <div class="date-rule-item">
+      <div>${h.startDate}${h.startDate !== h.endDate ? ' ~ ' + h.endDate : ''} · ${escapeHtml(h.label)}</div>
+      <button class="btn btn-red" style="font-size:12px; padding:4px 10px;" onclick="deleteHoliday('${h.id}')">삭제</button>
+    </div>`).join('');
+}
+
+function deleteHoliday(id) {
+  state.customHolidays = state.customHolidays.filter(h => h.id !== id);
+  saveState();
+  render();
+  renderHolidayList();
+}
+
+document.getElementById('saveHolidayBtn').onclick = () => {
+  const startDate = document.getElementById('holStart').value;
+  const endDate = document.getElementById('holEnd').value;
+  const label = document.getElementById('holLabel').value.trim();
+  if (!startDate || !endDate) { alert('기간을 입력하세요.'); return; }
+  if (startDate > endDate) { alert('시작일이 종료일보다 늦습니다.'); return; }
+  if (!label) { alert('휴일 이름을 입력하세요. (예: 방학, 재량휴업일)'); return; }
+  state.customHolidays.push({ id: crypto.randomUUID(), startDate, endDate, label });
+  saveState();
+  render();
+  renderHolidayList();
+  document.getElementById('holLabel').value = '';
+};
+
 // ===== 다중 선택 =====
 function updateMultiBar() {
   const n = state.selectedCells.length;
+  const nDelete = state.selectedCells.filter(c => c.kind === 'reservation').length;
+  const nEmpty = n - nDelete;
   const bar = document.getElementById('multiSelectBar');
   document.getElementById('multiSelectCount').textContent = `${n}개 선택됨`;
-  document.getElementById('multiSelectConfirmBtn').textContent = state.isAdmin
-    ? `${n}개 정규시간 추가`
-    : `${n}개 예약하기`;
+  let label;
+  if (nDelete && nEmpty) label = `${nDelete}건 삭제 + ${nEmpty}개 ${state.isAdmin ? '정규시간 추가' : '예약'}`;
+  else if (nDelete) label = `${nDelete}건 삭제`;
+  else label = state.isAdmin ? `${nEmpty}개 정규시간 추가` : `${nEmpty}개 예약하기`;
+  document.getElementById('multiSelectConfirmBtn').textContent = label;
   bar.hidden = !state.multiSelect;
 }
 
@@ -799,35 +1064,57 @@ document.getElementById('multiSelectBtn').onclick = () => {
 
 document.getElementById('multiSelectCancelBtn').onclick = exitMultiSelect;
 
-document.getElementById('multiSelectConfirmBtn').onclick = () => {
+document.getElementById('multiSelectConfirmBtn').onclick = async () => {
   if (state.selectedCells.length === 0) return;
 
-  if (state.isAdmin) {
-    // 관리자: 정규시간 라벨 일괄 입력
-    const label = prompt(`선택한 ${state.selectedCells.length}개 칸의 정규시간 라벨을 입력하세요:\n(비우면 해당 칸의 정규시간 삭제)`);
-    if (label === null) return; // 취소
-    for (const c of state.selectedCells) {
-      state.schedule = state.schedule.filter(
-        s => !(s.room === c.room && s.dayOfWeek === c.dayName && s.period === c.period)
-      );
-      if (label.trim()) {
-        state.schedule.push({ room: c.room, dayOfWeek: c.dayName, period: c.period, label: label.trim() });
+  const toDelete = state.selectedCells.filter(c => c.kind === 'reservation');
+  const toEmpty = state.selectedCells.filter(c => c.kind !== 'reservation');
+
+  // 선택한 예약들 일괄 삭제 (관리자/일반 공통 — 예약 삭제엔 비밀번호가 필요 없는 정책)
+  if (toDelete.length) {
+    if (!confirm(`선택한 예약 ${toDelete.length}건을 삭제하시겠습니까?`)) return;
+    state.reservations = state.reservations.filter(r => !toDelete.some(c => c.reservationId === r.id));
+    saveState();
+    if (API.enabled() && localStorage.getItem('autoSave') === '1') {
+      for (const c of toDelete) {
+        try { await API.deleteReservation(c.reservationId); } catch (e) { console.warn(e); }
       }
     }
-    saveState();
-    exitMultiSelect();
+    // 처리한 삭제 대상은 선택에서 제거 (다시 확인 눌러도 중복 삭제 시도 안 하도록)
+    state.selectedCells = state.selectedCells.filter(c => c.kind !== 'reservation');
+  }
+
+  if (toEmpty.length) {
+    if (state.isAdmin) {
+      // 관리자: 정규시간 라벨 일괄 입력
+      const label = prompt(`선택한 ${toEmpty.length}개 칸의 정규시간 라벨을 입력하세요:\n(비우면 해당 칸의 정규시간 삭제)`);
+      if (label === null) return; // 취소 시 선택 유지 (삭제는 위에서 이미 처리됨)
+      for (const c of toEmpty) {
+        state.schedule = state.schedule.filter(
+          s => !(s.room === c.room && s.dayOfWeek === c.dayName && s.period === c.period)
+        );
+        if (label.trim()) {
+          state.schedule.push({ room: c.room, dayOfWeek: c.dayName, period: c.period, label: label.trim() });
+        }
+      }
+      saveState();
+      exitMultiSelect();
+      return;
+    }
+
+    // 일반 사용자: 예약 일괄 입력
+    _editingReservationId = null;
+    document.getElementById('reservationModalTitle').textContent = '예약하기';
+    state.pendingCell = null;
+    state.pendingBatch = toEmpty.map(c => ({ room: c.room, date: c.date, period: c.period }));
+    prefillNameAndClassroom();
+    document.getElementById('resMeetingMode').checked = false;
+    document.getElementById('resPurpose').value = '';
+    showModal('reservationModal');
     return;
   }
 
-  // 일반 사용자: 예약 일괄 입력
-  state.pendingCell = null;
-  state.pendingBatch = [...state.selectedCells];
-  document.getElementById('resName').value = '';
-  document.getElementById('resGrade').value = '';
-  document.getElementById('resClassNum').value = '';
-  document.getElementById('resPurpose').value = '';
-  document.getElementById('resPassword').value = '';
-  showModal('reservationModal');
+  exitMultiSelect();
 };
 
 // ===== 초기화 =====
@@ -837,10 +1124,26 @@ function render() {
   renderSchedule();
 }
 
+// config.js 값을 localStorage에 적용. config version이 바뀌면 모든 브라우저에 다시 적용.
+// (같은 version 안에서는 사용자가 설정창에서 바꾼 값이 유지됨)
+function seedConfigDefaults() {
+  if (typeof APP_CONFIG === 'undefined') return;
+  if (localStorage.getItem('configVersion') === String(APP_CONFIG.version)) return;
+  localStorage.setItem('apiUrl', APP_CONFIG.apiUrl);
+  localStorage.setItem('serverEnabled', APP_CONFIG.serverEnabled ? '1' : '0');
+  localStorage.setItem('autoSave', APP_CONFIG.autoSave ? '1' : '0');
+  localStorage.setItem('autoLoad', APP_CONFIG.autoLoad ? '1' : '0');
+  localStorage.setItem('autoLoadInterval', String(APP_CONFIG.autoLoadInterval));
+  localStorage.setItem('configVersion', String(APP_CONFIG.version));
+}
+
 function init() {
+  seedConfigDefaults();
   if (!state.currentRoom) state.currentRoom = state.rooms[0] || null;
   if (state.isAdmin) document.body.classList.add('admin');
+  updateAdminBtnLabel();
   render();
   setupAutoLoad();
+  if (API.enabled()) loadFromServer({ includeSettings: true });   // 시작 시 공유 시트 상태를 바로 반영
 }
 init();

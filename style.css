@@ -1,9 +1,9 @@
 * { box-sizing: border-box; }
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", sans-serif;
+  font-family: "Noto Sans KR", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   margin: 0;
-  background: #f5f6f8;
-  color: #222;
+  background: #f7fafc;
+  color: #181c1e;
 }
 .container { max-width: 1400px; margin: 0 auto; padding: 16px; }
 
@@ -14,8 +14,9 @@ body {
   align-items: center;
   background: #fff;
   padding: 12px 16px;
-  border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.03);
   flex-wrap: wrap;
   gap: 8px;
 }
@@ -33,6 +34,7 @@ body {
   cursor: pointer;
   color: #fff;
   font-weight: 500;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
 }
 .btn-icon {
   width: 32px; height: 32px;
@@ -41,8 +43,8 @@ body {
   border-radius: 6px;
   cursor: pointer;
 }
-.btn-dark   { background: #222; }
-.btn-blue   { background: #3b82f6; }
+.btn-dark   { background: #181c1e; }
+.btn-blue   { background: #0e3b69; }
 .btn-purple { background: #8b5cf6; }
 .btn-orange { background: #f97316; }
 .btn-teal   { background: #14b8a6; }
@@ -56,7 +58,9 @@ body {
   margin-top: 12px;
   background: #fff;
   padding: 12px;
-  border-radius: 12px;
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.03);
   display: flex;
   gap: 6px;
   overflow-x: auto;
@@ -71,19 +75,19 @@ body {
   white-space: nowrap;
   color: #444;
 }
-.tab.active { background: #3b82f6; color: #fff; }
+.tab.active { background: #0e3b69; color: #fff; }
 .tab.add-tab { background: #22c55e; color: #fff; }
 
 /* 시간표 */
-main { background: #fff; margin-top: 12px; padding: 16px; border-radius: 12px; }
-h2 { margin: 4px 0 12px; font-size: 18px; }
+main { background: #fff; margin-top: 12px; padding: 16px; border-radius: 16px; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.03); }
+h2 { margin: 4px 0 12px; font-size: 18px; font-family: "Hanken Grotesk", "Noto Sans KR", sans-serif; font-weight: 700; }
 .schedule {
   width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
 }
 .schedule th, .schedule td {
-  border: 1px solid #e5e7eb;
+  border: 1px solid #e2e8f0;
   padding: 8px;
   text-align: center;
   vertical-align: middle;
@@ -92,22 +96,26 @@ h2 { margin: 4px 0 12px; font-size: 18px; }
   position: relative;
 }
 .schedule th {
-  background: #f9fafb;
+  background: #f1f4f6;
   font-weight: 600;
 }
+.schedule th .th-date { display: block; font-size: 12px; color: #888; font-weight: 400; margin-top: 2px; }
+.schedule th.holiday { background: #fef2f2; }
+.schedule th .th-holiday { display: block; font-size: 11px; color: #ef4444; font-weight: 600; margin-top: 2px; }
 .schedule td.period-cell {
   background: #f9fafb;
   font-weight: 500;
   width: 110px;
 }
-.schedule .period-time { display: block; font-size: 11px; color: #888; margin-top: 2px; }
-.schedule td.empty:hover { background: #f0f9ff; cursor: pointer; }
+.schedule .period-time { display: block; font-size: 11px; color: #888; margin-top: 2px; font-weight: 400; }
+.schedule td.empty:hover { box-shadow: inset 0 0 0 1px #2c5282; cursor: pointer; }
+.schedule td.empty.holiday-cell { background: #f3f4f6; }
+.schedule td.empty.holiday-cell:hover { background: #e5e7eb; }
 .schedule td.reserved {
-  background: #d1fae5;
+  background: rgba(190, 238, 205, 0.4);
   cursor: pointer;
   position: relative;
 }
-.schedule td.reserved .star { color: #f59e0b; }
 .schedule td.reserved .name { font-weight: 600; font-size: 14px; }
 .schedule td.reserved .meta { font-size: 12px; color: #555; margin-top: 2px; }
 .schedule td .schedule-note {
@@ -119,12 +127,11 @@ h2 { margin: 4px 0 12px; font-size: 18px; }
   font-style: normal;
   pointer-events: none;
 }
-.schedule td.lunch-row { background: #fafafa; }
-
 /* 모달 */
 .modal-backdrop {
   position: fixed; inset: 0;
   background: rgba(0,0,0,0.35);
+  backdrop-filter: blur(8px);
   display: flex; align-items: center; justify-content: center;
   z-index: 100;
 }
@@ -133,11 +140,11 @@ h2 { margin: 4px 0 12px; font-size: 18px; }
 .modal-backdrop[hidden] { display: none !important; }
 .modal {
   background: #fff;
-  border-radius: 12px;
+  border-radius: 16px;
   padding: 24px;
   width: 420px;
   max-width: 92vw;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+  box-shadow: 0 10px 25px rgba(0,0,0,0.1);
   max-height: 90vh;
   overflow-y: auto;
 }
@@ -155,6 +162,7 @@ h2 { margin: 4px 0 12px; font-size: 18px; }
   margin-top: 20px;
   display: flex; justify-content: flex-end; gap: 8px;
 }
+#holidayList { margin-top: 16px; }
 .modal .row { display: flex; gap: 8px; margin-top: 8px; }
 .modal .hint { font-size: 12px; color: #777; margin: 4px 0 12px; }
 
@@ -177,22 +185,22 @@ h2 { margin: 4px 0 12px; font-size: 18px; }
 .period-check-item input { cursor: pointer; }
 .date-rule-item {
   display: flex; justify-content: space-between; align-items: center;
-  padding: 10px; border: 1px solid #e5e7eb; border-radius: 8px;
+  padding: 10px; box-shadow: 0 0 0 1px #e5e7eb; border-radius: 8px;
   margin-bottom: 8px; font-size: 13px;
 }
 
 /* 다중 선택 */
 .schedule td.selected {
   background: #dbeafe !important;
-  outline: 2px solid #3b82f6;
+  outline: 2px solid #0e3b69;
   outline-offset: -2px;
 }
 body.multi-select .schedule td.empty {
   cursor: crosshair;
 }
 #multiSelectBtn.active {
-  background: #1d4ed8;
-  box-shadow: 0 0 0 2px #fff, 0 0 0 4px #3b82f6;
+  background: #0e3b69;
+  box-shadow: 0 0 0 2px #fff, 0 0 0 4px #0e3b69;
 }
 .multi-bar {
   position: fixed;
@@ -224,4 +232,37 @@ body.admin #myReservationsBtn { display: none; }
 body.admin #adminBtn {
   box-shadow: 0 0 0 2px #fff, 0 0 0 4px #ef4444;
   font-weight: 700;
+}
+
+/* ===== 반응형 (모바일) ===== */
+@media (max-width: 640px) {
+  .container { padding: 8px; }
+
+  /* 상단바: 세로 정렬 + 요소 꽉 채우기 */
+  .top-bar { padding: 10px; gap: 8px; }
+  .date-nav, .actions { width: 100%; }
+  .date-nav { justify-content: space-between; }
+  #weekSelect { flex: 1; min-width: 0; font-size: 14px; padding: 8px; height: 40px; }
+  .date-nav .btn { font-size: 14px; padding: 8px 12px; }
+  .btn-icon { width: 40px !important; height: 40px !important; font-size: 16px; }
+  .actions .btn { font-size: 12px; padding: 8px 10px; flex: 1 1 auto; }
+
+  main { padding: 8px; }
+  h2 { font-size: 16px; }
+
+  /* 표: 가로 스크롤 없이 한 주 전체를 화면 폭에 맞춤. 시간은 공간이 부족해 숨기고, 나머지 글자는 최대한 키움 */
+  .schedule { width: 100%; table-layout: fixed; }
+  .schedule th, .schedule td { padding: 3px 2px; font-size: 13px; height: 62px; word-break: keep-all; }
+  .schedule td.period-cell { width: 46px; font-size: 12px; padding: 2px; }
+  .schedule .period-time { display: none; }
+  .schedule th .th-date { font-size: 11px; }
+  .schedule th .th-holiday { font-size: 10px; }
+  .schedule td.reserved .name { font-size: 13px; }
+  .schedule td.reserved .meta { font-size: 12px; }       /* 학급·목적 모두 표시(길면 아래로 줄바꿈) */
+  .schedule td .schedule-note { position: static; display: block; font-size: 10px; margin-top: 2px; }
+
+  /* 다중 선택 하단 바 */
+  .multi-bar { padding: 10px 14px; gap: 8px; }
+  #multiSelectCount { font-size: 13px; }
+  .multi-bar .btn { font-size: 13px; padding: 8px 10px; }
 }
