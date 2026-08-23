@@ -77,12 +77,12 @@ body {
 }
 .tab.active { background: #0e3b69; color: #fff; }
 .tab.add-tab { background: #22c55e; color: #fff; }
-.tab-wrap { display: flex; align-items: center; }
-.tab-move {
-  padding: 4px 6px; border: none; background: transparent; color: #aaa;
-  font-size: 12px; cursor: pointer; border-radius: 6px;
+.tab.dragging {
+  position: relative; z-index: 20; background: #fff;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.18);
+  transition: none; cursor: grabbing;
 }
-.tab-move:hover { background: #f1f5f9; color: #555; }
+body.admin .tab:not(.add-tab) { touch-action: none; }
 
 /* 시간표 */
 main { background: #fff; margin-top: 12px; padding: 16px; border-radius: 16px; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.03); }
@@ -117,8 +117,9 @@ h2 { margin: 4px 0 12px; font-size: 18px; font-family: "Hanken Grotesk", "Noto S
 .schedule td.empty:hover { box-shadow: inset 0 0 0 1px #2c5282; cursor: pointer; }
 .schedule td.empty.holiday-cell { background: #f3f4f6; }
 .schedule td.empty.holiday-cell:hover { background: #e5e7eb; }
-.schedule td.empty.blocked-cell { background: repeating-linear-gradient(45deg, #fee2e2, #fee2e2 8px, #fecaca 8px, #fecaca 16px); }
-.schedule td.empty.blocked-cell:hover { filter: brightness(0.97); }
+.schedule td.empty.blocked-cell { background: #fdf2f2; }
+.schedule td.empty.blocked-cell:hover { background: #fce4e4; }
+.schedule td.empty.blocked-cell .schedule-note { color: #b91c1c; }
 
 /* 월별 보기 */
 .month-nav { display: flex; align-items: center; justify-content: center; gap: 16px; margin-bottom: 12px; }

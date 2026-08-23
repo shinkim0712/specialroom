@@ -136,26 +136,16 @@ function weekLabel(start) {
 function renderTabs() {
   const nav = document.getElementById('roomTabs');
   nav.innerHTML = '';
-  state.rooms.forEach((r, i) => {
-    const wrap = document.createElement('span');
-    wrap.className = 'tab-wrap';
-    if (state.isAdmin && i > 0) {
-      const left = document.createElement('button');
-      left.className = 'tab-move';
-      left.textContent = '◀';
-      left.title = '왼쪽으로 이동';
-      left.onclick = (e) => {
-        e.stopPropagation();
-        [state.rooms[i - 1], state.rooms[i]] = [state.rooms[i], state.rooms[i - 1]];
-        saveState(); render();
-      };
-      wrap.appendChild(left);
-    }
+  state.rooms.forEach(r => {
     const b = document.createElement('button');
     b.className = 'tab' + (r === state.currentRoom ? ' active' : '');
     b.textContent = r;
-    b.onclick = () => { state.currentRoom = r; render(); };
-    // 관리자: 우클릭으로 삭제
+    b.addEventListener('click', () => {
+      if (b.dataset.suppressClick === '1') { delete b.dataset.suppressClick; return; }
+      state.currentRoom = r;
+      render();
+    });
+    // 관리자: 우클릭으로 삭제, 꾹 눌러서 좌우로 끌면 순서 변경
     if (state.isAdmin) {
       b.oncontextmenu = (e) => {
         e.preventDefault();
@@ -166,21 +156,9 @@ function renderTabs() {
           saveState(); render();
         }
       };
+      enableTabDrag(b);
     }
-    wrap.appendChild(b);
-    if (state.isAdmin && i < state.rooms.length - 1) {
-      const right = document.createElement('button');
-      right.className = 'tab-move';
-      right.textContent = '▶';
-      right.title = '오른쪽으로 이동';
-      right.onclick = (e) => {
-        e.stopPropagation();
-        [state.rooms[i], state.rooms[i + 1]] = [state.rooms[i + 1], state.rooms[i]];
-        saveState(); render();
-      };
-      wrap.appendChild(right);
-    }
-    nav.appendChild(wrap);
+    nav.appendChild(b);
   });
   if (state.isAdmin) {
     const add = document.createElement('button');
@@ -189,6 +167,66 @@ function renderTabs() {
     add.onclick = addRoom;
     nav.appendChild(add);
   }
+}
+
+// 관리자 모드: 탭을 꾹 눌렀다가(롱프레스) 좌우로 끌면 특별실 순서가 바뀜 (마우스·터치 공통)
+function enableTabDrag(btn) {
+  const LONG_PRESS_MS = 350;
+  let pressTimer = null;
+  let dragging = false;
+  let startX = 0;
+
+  const cancelPress = () => { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } };
+
+  btn.addEventListener('pointerdown', (e) => {
+    if (e.button !== undefined && e.button !== 0) return;
+    startX = e.clientX;
+    cancelPress();
+    pressTimer = setTimeout(() => {
+      dragging = true;
+      btn.dataset.suppressClick = '1';
+      btn.classList.add('dragging');
+      try { btn.setPointerCapture(e.pointerId); } catch (_) {}
+    }, LONG_PRESS_MS);
+  });
+
+  btn.addEventListener('pointermove', (e) => {
+    if (!dragging) {
+      if (pressTimer && Math.abs(e.clientX - startX) > 10) cancelPress();
+      return;
+    }
+    e.preventDefault();
+    btn.style.transform = `translateX(${e.clientX - startX}px)`;
+    // 드래그 중인 탭 자신이 그 자리를 시각적으로 덮고 있을 수 있어 elementFromPoint 대신 스택 전체를 훑음
+    const stack = document.elementsFromPoint(e.clientX, e.clientY);
+    const hovered = stack.find(el => el.closest && el.closest('.tab:not(.add-tab):not(.dragging)'));
+    const target = hovered && hovered.closest('.tab:not(.add-tab):not(.dragging)');
+    if (target && target.parentElement === btn.parentElement) {
+      const nav = btn.parentElement;
+      const tabs = [...nav.querySelectorAll('.tab:not(.add-tab)')];
+      const fromIdx = tabs.indexOf(btn);
+      const toIdx = tabs.indexOf(target);
+      if (fromIdx !== -1 && toIdx !== -1 && fromIdx !== toIdx) {
+        [state.rooms[fromIdx], state.rooms[toIdx]] = [state.rooms[toIdx], state.rooms[fromIdx]];
+        nav.insertBefore(btn, fromIdx < toIdx ? target.nextSibling : target);
+        startX = e.clientX;  // 위치가 옮겨졌으니 손가락 기준점 재설정
+        btn.style.transform = 'translateX(0px)';
+      }
+    }
+  });
+
+  const endDrag = () => {
+    cancelPress();
+    if (dragging) {
+      dragging = false;
+      btn.classList.remove('dragging');
+      btn.style.transform = '';
+      saveState();
+      setTimeout(() => { delete btn.dataset.suppressClick; }, 0);
+    }
+  };
+  btn.addEventListener('pointerup', endDrag);
+  btn.addEventListener('pointercancel', endDrag);
 }
 
 function addRoom() {
@@ -292,7 +330,8 @@ function makeCell(room, dateKey, periodKey, dayName) {
     if (blockedRule) td.classList.add('blocked-cell');
     if (scheduleNote) {
       td.classList.add('has-schedule');
-      td.innerHTML = `<span class="schedule-note">${escapeHtml(scheduleNote)}</span>`;
+      const noteText = (blockedRule ? '🔒 ' : '') + scheduleNote;
+      td.innerHTML = `<span class="schedule-note">${escapeHtml(noteText)}</span>`;
     }
     if (state.multiSelect) {
       const key = state.isAdmin ? `${room}|${dayName}|${periodKey}|empty` : `${room}|${dateKey}|${periodKey}|empty`;
@@ -995,6 +1034,7 @@ if (window.flatpickr) {
   fpHolEnd   = flatpickr('#holEnd',   { locale: 'ko', dateFormat: 'Y-m-d', disableMobile: true });
   fpWeek = flatpickr('#weekPicker', {
     locale: 'ko', dateFormat: 'Y-m-d', disableMobile: true,
+    positionElement: document.getElementById('weekSelect'),  // 숨겨둔 input이 아니라 실제 버튼 위치 기준으로 팝업 표시
     onChange: (selectedDates) => {
       if (!selectedDates.length) return;
       state.weekStart = getMondayOf(selectedDates[0]);
