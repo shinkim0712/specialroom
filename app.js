@@ -207,8 +207,9 @@ function enableTabDrag(btn) {
       const fromIdx = tabs.indexOf(btn);
       const toIdx = tabs.indexOf(target);
       if (fromIdx !== -1 && toIdx !== -1 && fromIdx !== toIdx) {
-        [state.rooms[fromIdx], state.rooms[toIdx]] = [state.rooms[toIdx], state.rooms[fromIdx]];
         nav.insertBefore(btn, fromIdx < toIdx ? target.nextSibling : target);
+        // 두 칸 맞바꾸기가 아니라 실제 옮겨진 화면 순서를 그대로 저장 (여러 칸 건너뛰어도 어긋나지 않게)
+        state.rooms = [...nav.querySelectorAll('.tab:not(.add-tab)')].map(t => t.textContent);
         startX = e.clientX;  // 위치가 옮겨졌으니 손가락 기준점 재설정
         btn.style.transform = 'translateX(0px)';
       }

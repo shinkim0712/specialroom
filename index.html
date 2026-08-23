@@ -7,11 +7,12 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=Hanken+Grotesk:wght@600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=32" />
+  <link rel="stylesheet" href="style.css?v=33" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
   <style>
-    .flatpickr-calendar { font-size: 16px !important; width: 380px !important; }
-    .flatpickr-day { height: 46px !important; line-height: 46px !important; font-size: 15px !important; }
+    .flatpickr-calendar { font-size: 16px !important; width: 380px !important; max-width: 94vw !important; }
+    .flatpickr-innerContainer, .flatpickr-rContainer, .flatpickr-days, .dayContainer { width: 100% !important; max-width: 100% !important; }
+    .flatpickr-day { height: 46px !important; line-height: 46px !important; font-size: 15px !important; max-width: none !important; }
     .flatpickr-months .flatpickr-month { height: 44px !important; background: #0e3b69 !important; border-radius: 8px 8px 0 0 !important; }
     .flatpickr-current-month { font-size: 17px !important; padding-top: 8px !important; color: #fff !important; }
     .flatpickr-current-month .cur-month, .flatpickr-current-month input.cur-year { color: #fff !important; }
@@ -284,6 +285,6 @@
   <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ko.js"></script>
   <script src="config.js?v=2"></script>
   <script src="api.js?v=19"></script>
-  <script src="app.js?v=41"></script>
+  <script src="app.js?v=42"></script>
 </body>
 </html>

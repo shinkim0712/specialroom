@@ -21,7 +21,7 @@ body {
   gap: 8px;
 }
 .date-nav, .actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-#weekSelect { padding: 10px 16px; border-radius: 8px; border: 1px solid #ddd; font-size: 17px; font-weight: 600; height: 44px; }
+#weekSelect { padding: 10px 16px; border-radius: 8px; border: 1px solid #ddd; font-size: 17px; font-weight: 600; height: 44px; background: #fff; color: #181c1e; cursor: pointer; }
 .btn-icon { width: 44px !important; height: 44px !important; font-size: 18px; }
 .date-nav .btn { font-size: 16px; padding: 10px 18px; }
 
