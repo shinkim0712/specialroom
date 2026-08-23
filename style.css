@@ -77,6 +77,12 @@ body {
 }
 .tab.active { background: #0e3b69; color: #fff; }
 .tab.add-tab { background: #22c55e; color: #fff; }
+.tab-wrap { display: flex; align-items: center; }
+.tab-move {
+  padding: 4px 6px; border: none; background: transparent; color: #aaa;
+  font-size: 12px; cursor: pointer; border-radius: 6px;
+}
+.tab-move:hover { background: #f1f5f9; color: #555; }
 
 /* 시간표 */
 main { background: #fff; margin-top: 12px; padding: 16px; border-radius: 16px; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.03); }

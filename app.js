@@ -134,7 +134,21 @@ function weekLabel(start) {
 function renderTabs() {
   const nav = document.getElementById('roomTabs');
   nav.innerHTML = '';
-  state.rooms.forEach(r => {
+  state.rooms.forEach((r, i) => {
+    const wrap = document.createElement('span');
+    wrap.className = 'tab-wrap';
+    if (state.isAdmin && i > 0) {
+      const left = document.createElement('button');
+      left.className = 'tab-move';
+      left.textContent = '◀';
+      left.title = '왼쪽으로 이동';
+      left.onclick = (e) => {
+        e.stopPropagation();
+        [state.rooms[i - 1], state.rooms[i]] = [state.rooms[i], state.rooms[i - 1]];
+        saveState(); render();
+      };
+      wrap.appendChild(left);
+    }
     const b = document.createElement('button');
     b.className = 'tab' + (r === state.currentRoom ? ' active' : '');
     b.textContent = r;
@@ -151,7 +165,20 @@ function renderTabs() {
         }
       };
     }
-    nav.appendChild(b);
+    wrap.appendChild(b);
+    if (state.isAdmin && i < state.rooms.length - 1) {
+      const right = document.createElement('button');
+      right.className = 'tab-move';
+      right.textContent = '▶';
+      right.title = '오른쪽으로 이동';
+      right.onclick = (e) => {
+        e.stopPropagation();
+        [state.rooms[i], state.rooms[i + 1]] = [state.rooms[i + 1], state.rooms[i]];
+        saveState(); render();
+      };
+      wrap.appendChild(right);
+    }
+    nav.appendChild(wrap);
   });
   if (state.isAdmin) {
     const add = document.createElement('button');
