@@ -298,9 +298,9 @@ function makeCell(room, dateKey, periodKey, dayName) {
     td.className = 'reserved';
     const noteHtml = scheduleNote ? `<span class="schedule-note">${escapeHtml(scheduleNote)}</span>` : '';
     td.innerHTML = `
-      <div><span class="star">📌</span> <span class="name">${escapeHtml(reservation.purpose || '')}</span></div>
-      <div class="meta meta-class">${escapeHtml(reservation.name)}</div>
-      <div class="meta meta-purpose">${escapeHtml(reservation.classroom || '')}</div>
+      <div><span class="star">📌</span> <span class="name">${escapeHtml(reservation.classroom || '')}</span></div>
+      <div class="meta meta-class">${escapeHtml(reservation.purpose || '')}</div>
+      <div class="meta meta-purpose">${escapeHtml(reservation.name)}</div>
       ${noteHtml}
     `;
     if (state.multiSelect && state.selectedCells.some(c => c._key === `${room}|${dateKey}|${periodKey}|res`)) {
