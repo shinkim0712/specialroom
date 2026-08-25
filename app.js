@@ -298,8 +298,8 @@ function makeCell(room, dateKey, periodKey, dayName) {
     td.className = 'reserved';
     const noteHtml = scheduleNote ? `<span class="schedule-note">${escapeHtml(scheduleNote)}</span>` : '';
     td.innerHTML = `
-      <div><span class="star">📌</span> <span class="name">${escapeHtml(reservation.name)}</span></div>
-      <div class="meta meta-class">${escapeHtml(reservation.classroom || '')}</div>
+      <div><span class="star">📌</span> <span class="name">${escapeHtml(reservation.classroom || '')}</span></div>
+      <div class="meta meta-class">${escapeHtml(reservation.name)}</div>
       <div class="meta meta-purpose">${escapeHtml(reservation.purpose || '')}</div>
       ${noteHtml}
     `;
