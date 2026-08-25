@@ -1055,6 +1055,8 @@ if (window.flatpickr) {
 }
 
 // ===== 기간 정규시간 =====
+let _editingDateRuleId = null;
+
 document.getElementById('dateRuleBtn').onclick = () => {
   const sel = document.getElementById('drRoom');
   sel.innerHTML = state.rooms.map(r => `<option value="${escapeHtml(r)}">${escapeHtml(r)}</option>`).join('');
@@ -1072,9 +1074,25 @@ document.getElementById('dateRuleBtn').onclick = () => {
   if (fpEnd)   fpEnd.setDate(today, true);   else document.getElementById('drEnd').value = today;
   document.getElementById('drLabel').value = '';
   document.getElementById('drBlock').checked = false;
+  _editingDateRuleId = null;
+  document.getElementById('saveDateRuleBtn').textContent = '추가';
   renderDateRuleList();
   showModal('dateRuleModal');
 };
+
+function editDateRule(id) {
+  const r = state.dateRules.find(x => x.id === id);
+  if (!r) return;
+  document.getElementById('drRoom').value = r.room;
+  if (fpStart) fpStart.setDate(r.startDate, true); else document.getElementById('drStart').value = r.startDate;
+  if (fpEnd)   fpEnd.setDate(r.endDate, true);     else document.getElementById('drEnd').value = r.endDate;
+  document.querySelectorAll('#drDays input').forEach(el => { el.checked = r.daysOfWeek.includes(el.value); });
+  document.querySelectorAll('#drPeriods input').forEach(el => { el.checked = r.periods.includes(el.value); });
+  document.getElementById('drBlock').checked = !!r.blocked;
+  document.getElementById('drLabel').value = r.label;
+  _editingDateRuleId = id;
+  document.getElementById('saveDateRuleBtn').textContent = '수정 완료';
+}
 
 function renderDateRuleList() {
   const list = document.getElementById('dateRuleList');
@@ -1087,12 +1105,19 @@ function renderDateRuleList() {
           <strong>${escapeHtml(r.room)}</strong> · ${r.startDate} ~ ${r.endDate} · 매주 ${(r.daysOfWeek && r.daysOfWeek.length ? r.daysOfWeek.join(',') : '전체')}요일${r.blocked ? ' · <span style="color:#dc2626;">🚫 예약금지</span>' : ''}<br>
           <span style="font-size:12px; color:#555;">${r.periods.map(k => PERIODS.find(p=>p.key===k)?.label||k).join(', ')} · ${escapeHtml(r.label)}</span>
         </div>
-        <button class="btn btn-red" style="font-size:12px; padding:4px 10px;" onclick="deleteDateRule('${r.id}')">삭제</button>
+        <div style="display:flex; gap:6px;">
+          <button class="btn btn-gray" style="font-size:12px; padding:4px 10px;" onclick="editDateRule('${r.id}')">수정</button>
+          <button class="btn btn-red" style="font-size:12px; padding:4px 10px;" onclick="deleteDateRule('${r.id}')">삭제</button>
+        </div>
       </div>`).join('')}`;
 }
 
 function deleteDateRule(id) {
   state.dateRules = state.dateRules.filter(r => r.id !== id);
+  if (_editingDateRuleId === id) {
+    _editingDateRuleId = null;
+    document.getElementById('saveDateRuleBtn').textContent = '추가';
+  }
   saveState();
   render();
   renderDateRuleList();
@@ -1139,21 +1164,42 @@ document.getElementById('saveDateRuleBtn').onclick = async () => {
     }
   }
 
-  state.dateRules.push({ id: crypto.randomUUID(), room, startDate, endDate, periods, daysOfWeek, label, blocked });
+  if (_editingDateRuleId) {
+    const idx = state.dateRules.findIndex(r => r.id === _editingDateRuleId);
+    if (idx !== -1) state.dateRules[idx] = { id: _editingDateRuleId, room, startDate, endDate, periods, daysOfWeek, label, blocked };
+    _editingDateRuleId = null;
+    document.getElementById('saveDateRuleBtn').textContent = '추가';
+  } else {
+    state.dateRules.push({ id: crypto.randomUUID(), room, startDate, endDate, periods, daysOfWeek, label, blocked });
+  }
   saveState();
   render();
   renderDateRuleList();
 };
 
 // ===== 학교자체 휴일 관리 (관리자) =====
+let _editingHolidayId = null;
+
 document.getElementById('holidayBtn').onclick = () => {
   const today = new Date().toISOString().slice(0, 10);
   if (fpHolStart) fpHolStart.setDate(today, true); else document.getElementById('holStart').value = today;
   if (fpHolEnd)   fpHolEnd.setDate(today, true);   else document.getElementById('holEnd').value = today;
   document.getElementById('holLabel').value = '';
+  _editingHolidayId = null;
+  document.getElementById('saveHolidayBtn').textContent = '추가';
   renderHolidayList();
   showModal('holidayModal');
 };
+
+function editHoliday(id) {
+  const h = state.customHolidays.find(x => x.id === id);
+  if (!h) return;
+  if (fpHolStart) fpHolStart.setDate(h.startDate, true); else document.getElementById('holStart').value = h.startDate;
+  if (fpHolEnd)   fpHolEnd.setDate(h.endDate, true);     else document.getElementById('holEnd').value = h.endDate;
+  document.getElementById('holLabel').value = h.label;
+  _editingHolidayId = id;
+  document.getElementById('saveHolidayBtn').textContent = '수정 완료';
+}
 
 function renderHolidayList() {
   const list = document.getElementById('holidayList');
@@ -1162,12 +1208,19 @@ function renderHolidayList() {
   list.innerHTML = sorted.map(h => `
     <div class="date-rule-item">
       <div>${h.startDate}${h.startDate !== h.endDate ? ' ~ ' + h.endDate : ''} · ${escapeHtml(h.label)}</div>
-      <button class="btn btn-red" style="font-size:12px; padding:4px 10px;" onclick="deleteHoliday('${h.id}')">삭제</button>
+      <div style="display:flex; gap:6px;">
+        <button class="btn btn-gray" style="font-size:12px; padding:4px 10px;" onclick="editHoliday('${h.id}')">수정</button>
+        <button class="btn btn-red" style="font-size:12px; padding:4px 10px;" onclick="deleteHoliday('${h.id}')">삭제</button>
+      </div>
     </div>`).join('');
 }
 
 function deleteHoliday(id) {
   state.customHolidays = state.customHolidays.filter(h => h.id !== id);
+  if (_editingHolidayId === id) {
+    _editingHolidayId = null;
+    document.getElementById('saveHolidayBtn').textContent = '추가';
+  }
   saveState();
   render();
   renderHolidayList();
@@ -1180,7 +1233,14 @@ document.getElementById('saveHolidayBtn').onclick = () => {
   if (!startDate || !endDate) { alert('기간을 입력하세요.'); return; }
   if (startDate > endDate) { alert('시작일이 종료일보다 늦습니다.'); return; }
   if (!label) { alert('휴일 이름을 입력하세요. (예: 방학, 재량휴업일)'); return; }
-  state.customHolidays.push({ id: crypto.randomUUID(), startDate, endDate, label });
+  if (_editingHolidayId) {
+    const idx = state.customHolidays.findIndex(h => h.id === _editingHolidayId);
+    if (idx !== -1) state.customHolidays[idx] = { id: _editingHolidayId, startDate, endDate, label };
+    _editingHolidayId = null;
+    document.getElementById('saveHolidayBtn').textContent = '추가';
+  } else {
+    state.customHolidays.push({ id: crypto.randomUUID(), startDate, endDate, label });
+  }
   saveState();
   render();
   renderHolidayList();
@@ -1355,6 +1415,10 @@ document.getElementById('prevMonth').onclick = () => {
 };
 document.getElementById('nextMonth').onclick = () => {
   state.monthCursor = new Date(state.monthCursor.getFullYear(), state.monthCursor.getMonth() + 1, 1);
+  renderMonthView();
+};
+document.getElementById('monthTodayBtn').onclick = () => {
+  state.monthCursor = new Date();
   renderMonthView();
 };
 
