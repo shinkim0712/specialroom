@@ -426,7 +426,7 @@ function openEditReservation(r) {
   _editingReservationId = r.id;
   document.getElementById('reservationModalTitle').textContent = '예약 수정';
   document.getElementById('resName').value = r.name || '';
-  const isMeetingClassroom = r.classroom === '회의' || r.classroom === '회의/학급';
+  const isMeetingClassroom = r.classroom === '회의/행사' || r.classroom === '회의' || r.classroom === '회의/학급';
   document.getElementById('resMeetingMode').checked = isMeetingClassroom;
   if (!isMeetingClassroom && r.classroom) {
     const m = r.classroom.match(/^([1-6]학년)(?:\s+(\d+반))?$/);
@@ -446,7 +446,7 @@ document.getElementById('saveReservationBtn').onclick = async () => {
   const isMeeting = document.getElementById('resMeetingMode').checked;
   const grade = document.getElementById('resGrade').value;
   const classNum = document.getElementById('resClassNum').value;
-  const classroom = isMeeting ? '회의' : ((grade && classNum) ? `${grade} ${classNum}` : (grade || classNum));
+  const classroom = isMeeting ? '회의/행사' : ((grade && classNum) ? `${grade} ${classNum}` : (grade || classNum));
   const purpose = document.getElementById('resPurpose').value.trim();
   if (!name) { alert('예약자명을 입력하세요.'); return; }
 
