@@ -295,7 +295,7 @@ function makeCell(room, dateKey, periodKey, dayName) {
   const dateRule = matchingRules.length ? matchingRules[matchingRules.length - 1] : null;
   const scheduleNote = dateRule ? dateRule.label : (sch ? sch.label : null);
   if (reservation) {
-    td.className = 'reserved';
+    td.className = 'reserved' + (reservation.classroom === '회의/행사' ? ' meeting' : '');
     const noteHtml = scheduleNote ? `<span class="schedule-note">${escapeHtml(scheduleNote)}</span>` : '';
     td.innerHTML = `
       <div><span class="star">📌</span> <span class="name">${escapeHtml(reservation.classroom || '')}</span></div>
@@ -1366,30 +1366,41 @@ function renderMonthView() {
   const weeksNeeded = Math.round((gridEnd - gridStart) / (7 * 86400000)) + 1;
 
   const table = document.getElementById('monthTable');
-  table.innerHTML = `<thead><tr>${['월','화','수','목','금','토','일'].map(d => `<th>${d}</th>`).join('')}</tr></thead>`;
+  table.innerHTML = `<thead><tr>${DAYS.map(d => `<th>${d}</th>`).join('')}</tr></thead>`;
   const tbody = document.createElement('tbody');
 
   for (let w = 0; w < weeksNeeded; w++) {
     const tr = document.createElement('tr');
-    for (let d = 0; d < 7; d++) {
+    for (let d = 0; d < 5; d++) {  // 주말은 항상 비어있어서 아예 뺌 — 월~금만
       const day = addDays(gridStart, w * 7 + d);
       const dateKey = fmtDateKey(day);
       const inMonth = day.getMonth() === m;
-      const isWeekend = d >= 5;
       const td = document.createElement('td');
       td.innerHTML = `<span class="day-num">${day.getDate()}</span>`;
       if (!inMonth) {
         td.classList.add('outside');
-      } else if (isWeekend) {
-        td.classList.add('weekend');
       } else {
         const holiday = getHolidayLabel(dateKey);
-        const count = state.reservations.filter(r => r.room === state.currentRoom && r.date === dateKey).length;
         if (holiday) {
           td.classList.add('holiday');
           td.innerHTML += `<span class="day-holiday">${escapeHtml(holiday)}</span>`;
         }
-        if (count) td.innerHTML += `<span class="day-count">${count}건</span>`;
+
+        // 그날 예약을 교시 순서대로 '교시 학년반(또는 회의/행사)' 그대로 글로 나열 — 해석 필요 없이 읽으면 끝
+        const dayRes = state.reservations
+          .filter(r => r.room === state.currentRoom && r.date === dateKey)
+          .sort((a, b) => PERIODS.findIndex(p => p.key === a.period) - PERIODS.findIndex(p => p.key === b.period));
+        const MAX_SHOW = 5;
+        dayRes.slice(0, MAX_SHOW).forEach(r => {
+          const pLabel = PERIODS.find(p => p.key === r.period)?.label || r.period;
+          const who = r.classroom || r.name;
+          const chipClass = 'day-res-chip' + (r.classroom === '회의/행사' ? ' meeting' : '');
+          td.innerHTML += `<span class="${chipClass}">${escapeHtml(pLabel)} ${escapeHtml(who)}</span>`;
+        });
+        if (dayRes.length > MAX_SHOW) {
+          td.innerHTML += `<span class="day-res-more">+${dayRes.length - MAX_SHOW}건 더</span>`;
+        }
+
         td.classList.add('day-cell');
         td.onclick = () => {
           state.weekStart = getMondayOf(day);

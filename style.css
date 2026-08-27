@@ -124,30 +124,39 @@ h2 { margin: 4px 0 12px; font-size: 18px; font-family: "Hanken Grotesk", "Noto S
 /* 월별 보기 */
 .month-nav { display: flex; align-items: center; justify-content: center; gap: 16px; margin-bottom: 12px; }
 .month-nav span { font-size: 18px; font-weight: 700; min-width: 120px; text-align: center; }
+
 .month-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .month-table th, .month-table td {
   border: 1px solid #e2e8f0;
-  text-align: center;
   vertical-align: top;
-  height: 84px;
+  height: 160px;
   padding: 6px;
   font-size: 13px;
 }
-.month-table th { background: #f1f4f6; font-weight: 600; padding: 8px; }
+.month-table th { background: #f1f4f6; font-weight: 600; padding: 8px; text-align: center; }
+.month-table td { text-align: left; }
 .month-table td.outside { color: #ccc; background: #fafafa; }
-.month-table td.weekend { background: #fafafa; color: #bbb; }
 .month-table td.day-cell { cursor: pointer; }
 .month-table td.day-cell:hover { box-shadow: inset 0 0 0 1px #2c5282; }
 .month-table td.holiday { background: #f3f4f6; }
 .month-table .day-num { font-weight: 600; }
 .month-table .day-holiday { display: block; font-size: 11px; color: #ef4444; margin-top: 2px; }
-.month-table .day-count { display: block; font-size: 11px; color: #0e3b69; font-weight: 600; margin-top: 4px; background: #dbeafe; border-radius: 10px; padding: 1px 6px; }
+
+/* 그날 예약을 '교시 학년반' 그대로 나열 — 해석 없이 바로 읽히게. 색은 주간표와 통일(연두=학급예약, 파랑=회의/행사) */
+.month-table .day-res-chip {
+  display: block; font-size: 11px; line-height: 1.5; color: #166534;
+  background: #dcfce7; border-radius: 4px; padding: 1px 4px; margin-top: 2px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.month-table .day-res-chip.meeting { color: #0e3b69; background: #eff6ff; }
+.month-table .day-res-more { display: block; font-size: 11px; color: #888; margin-top: 2px; }
 
 .schedule td.reserved {
   background: rgba(190, 238, 205, 0.4);
   cursor: pointer;
   position: relative;
 }
+.schedule td.reserved.meeting { background: rgba(191, 219, 254, 0.5); }  /* 회의/행사는 파란색으로 구분 */
 .schedule td.reserved .name { font-weight: 600; font-size: 14px; }
 .schedule td.reserved .meta { font-size: 12px; color: #555; margin-top: 2px; }
 .schedule td .schedule-note {
@@ -292,6 +301,10 @@ body.admin #adminBtn {
   .schedule td.reserved .name { font-size: 13px; }
   .schedule td.reserved .meta { font-size: 12px; }       /* 학급·목적 모두 표시(길면 아래로 줄바꿈) */
   .schedule td .schedule-note { position: static; display: block; font-size: 10px; margin-top: 2px; }
+
+  /* 월별 보기: 좁아도 글자는 그대로 보여줌(줄이 넘치면 말줄임표만) */
+  .month-table th, .month-table td { height: 140px; padding: 4px; font-size: 12px; }
+  .month-table .day-res-chip, .month-table .day-res-more { font-size: 10px; padding: 1px 2px; }
 
   /* 다중 선택 하단 바 */
   .multi-bar { padding: 10px 14px; gap: 8px; }
