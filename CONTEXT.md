@@ -3,13 +3,10 @@
 > 이 문서는 세션이 바뀌어도 이어서 작업할 수 있도록 정리한 현재 상태 스냅샷입니다.
 > 마지막 갱신: 2026-08-28
 
-## ⏳ 배포 대기 (2026-08-28 작업 — 운영엔 아무것도 안 나감)
-클라이언트: **app.js v56 / api.js v21 / style.css v39 / index.html**. `apps-script/Code.gs`도 대폭 수정됨. **운영 Apps Script·git push 둘 다 아직 안 함.** 테스트 Apps Script에는 1차분(액션 6개+cascade)만 올라가 있고 2차분(로그·요약 등)은 재배포 필요.
-
-### 배포 절차
-1. `apps-script/Code.gs` 전체 → 테스트 Apps Script에 붙여넣기 (`SHEET_ID`/`ADMIN_PW` 테스트값 유지) → 배포 관리 → 편집 → 새 버전
-2. 브라우저 탭에서 테스트 URL 세팅 후 검증
-3. 확인되면 운영 Apps Script 동일 배포 + `git add -A && git commit && git push`
+## ✅ 2026-08-28 배포 완료
+클라이언트: **app.js v56 / api.js v21 / style.css v39 / index.html** — git push 완료(커밋 `c7b9c64`), GitHub Pages·Vercel 자동 재배포.
+`apps-script/Code.gs` — 운영·테스트 Apps Script 양쪽에 배포 완료 (운영 `?action=logs` → `[]` 확인).
+테스트 시트 `logs` 탭에 검증용 6줄 남아있음(무해).
 
 ### Code.gs 새 액션
 `createDateRule` `updateDateRule` `deleteDateRule` `addRoom` `deleteRoom`(cascade purge) `reorderRooms` `log` `logs`
