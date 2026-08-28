@@ -3,15 +3,25 @@
 > 이 문서는 세션이 바뀌어도 이어서 작업할 수 있도록 정리한 현재 상태 스냅샷입니다.
 > 마지막 갱신: 2026-08-28
 
-## ✅ 2026-08-28 배포 완료
-클라이언트: **app.js v56 / api.js v21 / style.css v39 / index.html** — git push 완료(커밋 `c7b9c64`), GitHub Pages·Vercel 자동 재배포.
-`apps-script/Code.gs` — 운영·테스트 Apps Script 양쪽에 배포 완료 (운영 `?action=logs` → `[]` 확인).
-테스트 시트 `logs` 탭에 검증용 6줄 남아있음(무해).
+## ⏳ 2026-08-28 2차 — 운영 배포 대기
+1차분은 운영 배포 완료 (커밋 `c7b9c64`~`2aacb83`).
+2차분(학교휴일 실시간화, saveAll 제거, deleteRoom 안전화 #2, 다중삭제 확인창 상세화):
+**테스트 Apps Script 배포 + 전체 검증 완료.** 클라이언트 git push + 운영 Apps Script 배포만 남음.
+- app.js v57 / api.js v22
+- Code.gs 새 액션: `createHoliday` `updateHoliday` `deleteHoliday`. `saveAll` 액션·함수 **완전 제거**
+- 클라이언트: **"저장" 버튼 삭제** (학교휴일이 실시간 저장으로 바뀌어 버튼 불필요). `state.serverEverLoaded` 제거
+- 다중선택 일괄삭제 확인창이 삭제될 예약 목록(방·날짜·교시·이름·학급)을 최대 15건 표시
 
-### Code.gs 새 액션
-`createDateRule` `updateDateRule` `deleteDateRule` `addRoom` `deleteRoom`(cascade purge) `reorderRooms` `log` `logs`
-- `saveAll`은 이제 `holidays`만 씀 (rooms·dateRules·schedule 통째쓰기 제거)
+### Code.gs 낱개 저장 액션 (전부 실시간, autoSave 게이트)
+예약: `create`/`update`/`delete` · 특별실: `addRoom`/`deleteRoom`(cascade)/`reorderRooms`
+기간정규시간: `createDateRule`/`updateDateRule`/`deleteDateRule` · 학교휴일: `createHoliday`/`updateHoliday`/`deleteHoliday`
+로그: `log`(클라가 기록) / `logs`(읽기)
+- **통째 덮어쓰기(saveAll) 경로는 완전히 제거됨.** 이제 "저장 버튼 눌러야 반영"되는 데이터 없음
 - 삭제·수정 함수가 `logs` 시트에 "없어진 것" 기록 (appendLog, 3000줄 캡)
+
+### 위험 분석 대응
+- **#2 해결**: `deleteRoom`이 예약·정규시간·기간규칙을 `writeSheet`(clear+rewrite) 대신 `deleteRowsWhere`(해당 행만 역순 삭제)로 제거. 이제 "시트가 비는 순간"이 없어 중간에 실패해도 나머지 데이터 무사. `writeSheet`는 rooms(작음)·cleanup(드묾)에만 남음
+- **#1 보류** (사용자 판단): 관리자 모드는 자동 불러오기가 꺼져 있어 특별실 삭제 확인창의 "예약 N건 함께 삭제"가 낡은 숫자일 수 있음. 최악의 경우 예약 많은 방을 "비었네" 하고 삭제. → 삭제 직전 서버 재조회하면 해결되지만 이번엔 안 함
 
 ### 이번 배치에서 한 것 (2026-08-28, 큰 묶음)
 - 1~11: 기간규칙 사용자 개방+실시간, 특별실 추가 사용자 개방, 특별실 삭제/순서 실시간, "저장" 버튼 축소+안전장치, 예약금지 자동취소 폐지, 예약 유령버그, 특별실 삭제 cascade, 존댓말, 서버불러오기 관리자전용, 관리자 문구, Code.gs 보기 제거
@@ -62,7 +72,7 @@ UI/기능이 바뀌는 작업은 코드를 바로 고치지 말고, 먼저 "지�
 ```
 로컬 프리뷰: `.claude/launch.json`에 `specialroom` 설정 있음 (`python3 -m http.server 8123 --directory specialroom`).
 
-**캐시 버스팅**: `index.html`에서 `style.css?v=N`, `app.js?v=N` 형태로 버전 쿼리를 씀. **CSS/JS를 고칠 때마다 버전 숫자를 +1 해야** 브라우저가 새 파일을 받아감 (안 올리면 캐시된 옛날 파일 계속 로드됨 — 여러 번 겪은 문제). 현재: `style.css?v=39`, `app.js?v=56`, `api.js?v=21`, `config.js?v=2`.
+**캐시 버스팅**: `index.html`에서 `style.css?v=N`, `app.js?v=N` 형태로 버전 쿼리를 씀. **CSS/JS를 고칠 때마다 버전 숫자를 +1 해야** 브라우저가 새 파일을 받아감 (안 올리면 캐시된 옛날 파일 계속 로드됨 — 여러 번 겪은 문제). 현재: `style.css?v=39`, `app.js?v=57`, `api.js?v=22`, `config.js?v=2`.
 
 ## 서버 정보
 - **운영 Google Sheets ID**: `12XFU15WU8BylhAIF2FISd-mVpAQgr8Xvz1MU0iWIFHg` (미확인 표기가 있었으나 실사용 중인 것으로 확인됨)

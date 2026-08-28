@@ -97,7 +97,6 @@ const state = {
   selectedCells: [],   // [{room, date, period}]
   pendingBatch: null,  // 다중 선택 저장 시 사용
   autoLoadTimer: null,
-  serverEverLoaded: false,  // 이번 세션에 서버에서 1회 이상 성공적으로 불러왔는지 ("저장" 버튼 안전장치)
 };
 
 function load(key, def) {
@@ -628,17 +627,17 @@ const ADMIN_HELP_TEXT = `관리자 모드 활성화
 - 탭 꾹 눌러 드래그 → 순서 변경 (관리자만, 즉시 서버 반영)
 
 [학교휴일 관리]
-- 학교휴일 관리 버튼 → 방학·재량휴업일·개교기념일 등 학교자체 휴일 등록/삭제
-  (법정공휴일은 별도 설정 없이 자동으로 표시됨. "저장" 버튼으로 서버 반영)
+- 학교휴일 관리 버튼 → 방학·재량휴업일·개교기념일 등 학교자체 휴일 등록/삭제 (즉시 서버 반영)
+  (법정공휴일은 별도 설정 없이 자동으로 표시됨)
 
 [예약 관리]
 - 예약 삭제·수정에는 비밀번호 확인이 없습니다 (관리자든 일반 사용자든 동일)
 - 다중 선택으로 예약된 칸 여러 개를 골라 한 번에 삭제 가능
 
 [서버]
+- 모든 변경(예약·특별실·기간 정규시간·학교휴일)은 즉시 서버에 저장됩니다. 따로 "저장" 누를 필요 없음
+- 변경 기록 버튼: 삭제·수정·가림된 내용을 최근순으로 확인
 - 구글시트 설정 버튼 → Apps Script 연동 URL·자동저장/불러오기 설정, 서버 데이터 정리
-- "저장" 버튼: 요일별 정규시간·학교휴일을 구글시트에 저장
-  (예약·특별실·기간 정규시간은 자동 저장됨)
 - "서버에서 불러오기": 서버 데이터로 내 화면을 강제 교체 (관리자만)`;
 
 document.getElementById('adminBtn').onclick = async () => {
@@ -685,22 +684,6 @@ document.getElementById('weekSelect').onclick = () => {
 };
 
 // ===== 서버 동기화 =====
-document.getElementById('saveToServerBtn').onclick = async () => {
-  if (!API.enabled()) { alert('서버 연동이 비활성화되어 있습니다. 구글시트 설정에서 활성화하세요.'); return; }
-  // 안전장치: 이번 세션에 서버에서 한 번도 못 불러왔으면 저장 금지 (빈 값으로 서버를 덮어쓰는 사고 방지)
-  if (!state.serverEverLoaded) {
-    alert('아직 서버에서 데이터를 불러오지 못했습니다.\n"서버에서 불러오기"로 최신 상태를 받은 뒤 저장해 주세요.');
-    return;
-  }
-  // 특별실·기간 정규시간·예약은 실시간 자동저장. 이 버튼은 학교휴일만.
-  const msg = `학교휴일 ${state.customHolidays.length}건을 서버에 저장합니다.\n(특별실·기간 정규시간·예약은 자동 저장되어 여기 포함되지 않습니다)\n\n계속하시겠습니까?`;
-  if (!confirm(msg)) return;
-  try {
-    const result = await API.saveAll({ holidays: state.customHolidays });
-    alert(result.ok ? '학교휴일을 서버에 저장했습니다.' : '저장 실패: ' + (result.error || ''));
-  } catch (e) { alert('오류: ' + e.message); }
-};
-
 document.getElementById('loadFromServerBtn').onclick = async () => {
   if (!API.enabled()) { alert('서버 연동이 비활성화되어 있습니다.'); return; }
   if (!confirm('서버(구글 시트)의 데이터로 현재 데이터를 덮어쓰시겠습니까?\n(서버가 비어있으면 로컬 데이터가 모두 사라집니다)')) return;
@@ -766,7 +749,6 @@ async function loadFromServer({ force = false, includeSettings = false } = {}) {
       }));
     }
     if (Array.isArray(data.reservations)) {
-      state.serverEverLoaded = true;
       if (force) {
         state.reservations = data.reservations;
       } else {
@@ -1133,27 +1115,54 @@ function deleteHoliday(id) {
   saveState();
   render();
   renderHolidayList();
+  if (API.enabled() && localStorage.getItem('autoSave') === '1') {
+    API.deleteHoliday(id).catch(e => console.warn(e));
+  }
 }
 
-document.getElementById('saveHolidayBtn').onclick = () => {
+document.getElementById('saveHolidayBtn').onclick = async () => {
   const startDate = document.getElementById('holStart').value;
   const endDate = document.getElementById('holEnd').value;
   const label = document.getElementById('holLabel').value.trim();
   if (!startDate || !endDate) { alert('기간을 입력하세요.'); return; }
   if (startDate > endDate) { alert('시작일이 종료일보다 늦습니다.'); return; }
   if (!label) { alert('휴일 이름을 입력하세요. (예: 방학, 재량휴업일)'); return; }
-  if (_editingHolidayId) {
-    const idx = state.customHolidays.findIndex(h => h.id === _editingHolidayId);
-    if (idx !== -1) state.customHolidays[idx] = { id: _editingHolidayId, startDate, endDate, label };
-    _editingHolidayId = null;
-    document.getElementById('saveHolidayBtn').textContent = '추가';
+
+  const editingId = _editingHolidayId;
+  const hol = { id: editingId || crypto.randomUUID(), startDate, endDate, label };
+  const prevIdx = editingId ? state.customHolidays.findIndex(h => h.id === editingId) : -1;
+  const prevSnapshot = prevIdx !== -1 ? { ...state.customHolidays[prevIdx] } : null;
+
+  if (editingId) {
+    if (prevIdx !== -1) state.customHolidays[prevIdx] = hol;
   } else {
-    state.customHolidays.push({ id: crypto.randomUUID(), startDate, endDate, label });
+    state.customHolidays.push(hol);
   }
+  _editingHolidayId = null;
+  document.getElementById('saveHolidayBtn').textContent = '추가';
   saveState();
   render();
   renderHolidayList();
   document.getElementById('holLabel').value = '';
+
+  if (API.enabled() && localStorage.getItem('autoSave') === '1') {
+    try {
+      const res = editingId ? await API.updateHoliday(hol) : await API.createHoliday(hol);
+      if (!res || !res.ok) throw new Error((res && res.error) || 'save failed');
+    } catch (e) {
+      console.warn(e);
+      if (editingId && prevSnapshot) {
+        const i = state.customHolidays.findIndex(h => h.id === editingId);
+        if (i !== -1) state.customHolidays[i] = prevSnapshot;
+      } else {
+        state.customHolidays = state.customHolidays.filter(h => h.id !== hol.id);
+      }
+      saveState();
+      render();
+      renderHolidayList();
+      alert('학교휴일을 서버에 저장하지 못했습니다. 네트워크를 확인하고 다시 시도해 주세요.');
+    }
+  }
 };
 
 // ===== 다중 선택 =====
@@ -1199,7 +1208,16 @@ document.getElementById('multiSelectConfirmBtn').onclick = async () => {
 
   // 선택한 예약들 일괄 삭제 (관리자/일반 공통 — 예약 삭제엔 비밀번호가 필요 없는 정책)
   if (toDelete.length) {
-    if (!confirm(`선택한 예약 ${toDelete.length}건을 삭제하시겠습니까?`)) return;
+    const short = k => PERIODS.find(p => p.key === k)?.label || k;
+    const rs = toDelete
+      .map(c => state.reservations.find(r => r.id === c.reservationId))
+      .filter(Boolean)
+      .sort((a, b) => (a.date + a.period).localeCompare(b.date + b.period));
+    const shown = rs.slice(0, 15)
+      .map(r => `- ${r.room} ${r.date} ${short(r.period)} / ${r.name}${r.classroom ? ' (' + r.classroom + ')' : ''}`)
+      .join('\n');
+    const more = rs.length > 15 ? `\n… 외 ${rs.length - 15}건` : '';
+    if (!confirm(`아래 예약 ${toDelete.length}건을 삭제하시겠습니까? 되돌릴 수 없습니다.\n\n${shown}${more}`)) return;
     state.reservations = state.reservations.filter(r => !toDelete.some(c => c.reservationId === r.id));
     saveState();
     if (API.enabled() && localStorage.getItem('autoSave') === '1') {
@@ -1231,7 +1249,6 @@ document.getElementById('multiSelectConfirmBtn').onclick = async () => {
 // ===== 초기화 =====
 function render() {
   renderTabs();
-  document.getElementById('saveToServerBtn').disabled = !state.serverEverLoaded;
   const isMonth = state.viewMode === 'month';
   document.querySelector('.date-nav').style.display = isMonth ? 'none' : 'flex';
   document.getElementById('roomTitle').style.display = isMonth ? 'none' : '';

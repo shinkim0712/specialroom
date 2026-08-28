@@ -27,7 +27,6 @@ const API = {
   createReservation(r)     { return this._post('create', r); },
   updateReservation(r)     { return this._post('update', r); },
   deleteReservation(id)    { return this._post('delete', { id }); },
-  saveAll(data)            { return this._post('saveAll', data); },
   loadAll()                { return this._get('loadAll'); },
   cleanup(adminPw)         { return this._post('cleanup', { adminPw }); },
   checkAdmin(pw)           { return this._post('checkAdmin', { pw }); },
@@ -37,6 +36,9 @@ const API = {
   addRoom(name)            { return this._post('addRoom', { name }); },
   deleteRoom(name)         { return this._post('deleteRoom', { name }); },
   reorderRooms(order)      { return this._post('reorderRooms', { order }); },
+  createHoliday(h)         { return this._post('createHoliday', h); },
+  updateHoliday(h)         { return this._post('updateHoliday', h); },
+  deleteHoliday(id)        { return this._post('deleteHoliday', { id }); },
   log(kind, summary)       { return this._post('log', { kind, summary }); },
   logs()                   { return this._get('logs'); },
 };
