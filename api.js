@@ -31,4 +31,12 @@ const API = {
   loadAll()                { return this._get('loadAll'); },
   cleanup(adminPw)         { return this._post('cleanup', { adminPw }); },
   checkAdmin(pw)           { return this._post('checkAdmin', { pw }); },
+  createDateRule(r)        { return this._post('createDateRule', r); },
+  updateDateRule(r)        { return this._post('updateDateRule', r); },
+  deleteDateRule(id)       { return this._post('deleteDateRule', { id }); },
+  addRoom(name)            { return this._post('addRoom', { name }); },
+  deleteRoom(name)         { return this._post('deleteRoom', { name }); },
+  reorderRooms(order)      { return this._post('reorderRooms', { order }); },
+  log(kind, summary)       { return this._post('log', { kind, summary }); },
+  logs()                   { return this._get('logs'); },
 };

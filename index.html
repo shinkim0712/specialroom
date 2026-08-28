@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=Hanken+Grotesk:wght@600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=37" />
+  <link rel="stylesheet" href="style.css?v=39" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
   <style>
     .flatpickr-calendar { font-size: 16px !important; width: 380px !important; max-width: 94vw !important; }
@@ -38,11 +38,12 @@
       <div class="actions">
         <button id="myReservationsBtn" class="btn btn-blue">내 예약 보기</button>
         <button id="multiSelectBtn" class="btn btn-dark">다중 선택</button>
-        <button id="dateRuleBtn" class="btn btn-purple admin-only">기간 정규시간</button>
+        <button id="dateRuleBtn" class="btn btn-purple">기간 정규시간</button>
         <button id="holidayBtn" class="btn btn-purple admin-only">학교휴일 관리</button>
-        <button id="saveToServerBtn" class="btn btn-orange admin-only">정규시간표 서버저장</button>
-        <button id="loadFromServerBtn" class="btn btn-teal">서버에서 불러오기</button>
+        <button id="changeLogBtn" class="btn btn-teal admin-only">변경 기록</button>
+        <button id="loadFromServerBtn" class="btn btn-teal admin-only">서버에서 불러오기</button>
         <button id="sheetSettingsBtn" class="btn btn-purple admin-only">구글시트 설정</button>
+        <button id="saveToServerBtn" class="btn btn-orange admin-only">저장</button>
         <button id="adminBtn" class="btn btn-red">관리자 모드</button>
       </div>
     </header>
@@ -167,7 +168,6 @@
       <div id="detailInfo"></div>
       <div class="modal-actions">
         <button class="btn btn-gray" data-close>닫기</button>
-        <button class="btn btn-gray admin-only" id="editScheduleFromDetailBtn" hidden>정규시간 편집</button>
         <button class="btn btn-red" id="deleteResBtn">삭제</button>
         <button class="btn btn-blue" id="editResBtn">수정</button>
       </div>
@@ -185,6 +185,18 @@
     </div>
   </div>
 
+  <!-- 변경 기록 모달 (관리자) -->
+  <div class="modal-backdrop" id="changeLogModal" hidden>
+    <div class="modal modal-wide">
+      <h3>변경 기록 <span style="font-weight:400; font-size:13px; color:#888;">— 삭제·수정·가림된 내용</span></h3>
+      <p class="hint">예약·기간 정규시간·특별실이 삭제·수정됐거나 라벨이 가려졌을 때 여기 남습니다. 최근 것부터 표시되며, 누가 했는지는 기록하지 않습니다.</p>
+      <div id="changeLogBody" style="max-height:60vh; overflow:auto;"></div>
+      <div class="modal-actions">
+        <button class="btn btn-gray" data-close>닫기</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 구글시트 설정 도움말 모달 -->
   <div class="modal-backdrop" id="settingsHelpModal" hidden>
     <div class="modal modal-wide">
@@ -196,7 +208,7 @@
 
         <p><strong>2. Apps Script 코드 입력</strong><br>
         상단 메뉴 → 확장 프로그램 → Apps Script<br>
-        기존 내용 전부 지우고 <code>Code.gs</code> 내용 붙여넣기<br>
+        기존 내용 전부 지우고 저장소의 <code>apps-script/Code.gs</code> 내용 붙여넣기<br>
         상단 <code>SHEET_ID</code>에 스프레드시트 URL의 <code>/d/</code> 뒤 긴 문자열 입력<br>
         <code>ADMIN_PW</code>에 원하는 관리자 비밀번호 입력</p>
 
@@ -214,21 +226,6 @@
         <p style="background:#fef3c7; padding:10px; border-radius:8px; margin-top:8px;">
         ⚠️ 코드를 수정할 때마다 <strong>새 배포</strong>가 아닌 <strong>배포 관리 → 편집</strong>으로 업데이트해야 URL이 유지됩니다.</p>
       </div>
-      <div class="modal-actions">
-        <button class="btn btn-dark" id="showCodeBtn">Code.gs 보기</button>
-        <button class="btn btn-gray" data-close>닫기</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Code.gs 팝업 -->
-  <div class="modal-backdrop" id="codeModal" hidden>
-    <div class="modal modal-wide">
-      <h3 style="display:flex; justify-content:space-between; align-items:center;">
-        Code.gs
-        <button id="copyCodeBtn" class="btn btn-blue" style="font-size:13px; padding:6px 12px;">복사</button>
-      </h3>
-      <pre id="codeContent" style="background:#1e1e1e; color:#d4d4d4; padding:16px; border-radius:8px; font-size:12px; overflow:auto; max-height:60vh; white-space:pre; font-family:monospace;"></pre>
       <div class="modal-actions">
         <button class="btn btn-gray" data-close>닫기</button>
       </div>
@@ -269,24 +266,10 @@
     </div>
   </div>
 
-  <!-- 정규시간 라벨 입력 모달 -->
-  <div class="modal-backdrop" id="scheduleLabelModal" hidden>
-    <div class="modal">
-      <h3 id="scheduleLabelTitle">정규시간 설정</h3>
-      <label style="font-size:16px; color:#333;">표시할 텍스트</label>
-      <input id="scheduleLabelInput" type="text" style="font-size:18px; height:52px; margin-top:6px;" placeholder="예: 1학년 음악" />
-      <p style="font-size:13px; color:#aaa; margin:6px 0 0;">비우고 저장하면 삭제됩니다.</p>
-      <div class="modal-actions">
-        <button class="btn btn-gray" data-close>취소</button>
-        <button class="btn btn-blue" id="scheduleLabelSaveBtn">저장</button>
-      </div>
-    </div>
-  </div>
-
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ko.js"></script>
   <script src="config.js?v=2"></script>
-  <script src="api.js?v=19"></script>
-  <script src="app.js?v=51"></script>
+  <script src="api.js?v=21"></script>
+  <script src="app.js?v=56"></script>
 </body>
 </html>
