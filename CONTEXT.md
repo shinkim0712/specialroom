@@ -3,10 +3,11 @@
 > 이 문서는 세션이 바뀌어도 이어서 작업할 수 있도록 정리한 현재 상태 스냅샷입니다.
 > 마지막 갱신: 2026-08-28
 
-## ⏳ 2026-08-28 2차 — 운영 배포 대기
-1차분은 운영 배포 완료 (커밋 `c7b9c64`~`2aacb83`).
-2차분(학교휴일 실시간화, saveAll 제거, deleteRoom 안전화 #2, 다중삭제 확인창 상세화):
-**테스트 Apps Script 배포 + 전체 검증 완료.** 클라이언트 git push + 운영 Apps Script 배포만 남음.
+## ✅ 2026-08-28 전체 배포 완료
+- 1차: 실시간 동기화, 요일별 정규시간 제거, 변경 기록 등 (커밋 `c7b9c64`~`2aacb83`)
+- 2차: 학교휴일 실시간화, `saveAll` 제거, `deleteRoom` 행단위 삭제(#2), 다중삭제 확인창 상세화 (커밋 `0346124`)
+- 클라이언트 push 완료, 운영·테스트 Apps Script 배포 완료
+- 운영 확인: `?action=logs` → `[]`, `saveAll` → `unknown action`, 데이터 무손실(rooms 9/res 11/rules 101/hols 0)
 - app.js v57 / api.js v22
 - Code.gs 새 액션: `createHoliday` `updateHoliday` `deleteHoliday`. `saveAll` 액션·함수 **완전 제거**
 - 클라이언트: **"저장" 버튼 삭제** (학교휴일이 실시간 저장으로 바뀌어 버튼 불필요). `state.serverEverLoaded` 제거
