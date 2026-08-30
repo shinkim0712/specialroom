@@ -82,8 +82,9 @@ UI/기능이 바뀌는 작업은 코드를 바로 고치지 말고, 먼저 "지�
 - **관리자 비밀번호**: 클라이언트 코드엔 없음. `apps-script/Code.gs`의 `ADMIN_PW`에만 있고, 서버가 `checkAdmin` 액션으로 검증. 실제 값은 세션 기록에 없음(운영/테스트 서로 다름, 필요시 사용자에게 문의).
 
 ## GitHub / 배포
-- **계정**: shinkim0712 / **저장소**: https://github.com/shinkim0712/specialroom
-- **배포**: GitHub Pages `https://shinkim0712.github.io/specialroom/` + Vercel `https://sr-specialroom.vercel.app` (둘 다 GitHub 연동, push하면 자동 재배포)
+- **저장소**: https://github.com/songlim26/specialroom (2026-08-28 shinkim0712 → songlim26로 포크 이전)
+- **배포**: Vercel `https://sr-specialroom.vercel.app` (GitHub 연동, push하면 자동 재배포). GitHub Pages는 안 씀
+- ⚠️ 이 로컬 저장소의 remote는 아직 shinkim0712일 수 있음 → 포크 후 `git remote set-url origin https://github.com/songlim26/specialroom.git` 필요
 
 ```bash
 cd /Users/kimhyunjoonn/Documents/claude/specialroom

@@ -15,7 +15,7 @@
 |---|---|
 | 상태 | 학교에서 실제 운영 중 |
 | 접속 주소 | Vercel (`sr-specialroom.vercel.app`) |
-| 소스 저장소 | GitHub `shinkim0712/specialroom` (여기에 반영하면 Vercel이 자동 재배포) |
+| 소스 저장소 | GitHub `songlim26/specialroom` (여기에 반영하면 Vercel이 자동 재배포) |
 | 서버 실행 계정 | 처음 배포한 사람의 개인 Google 계정 (→ 5장) |
 
 ---
@@ -102,7 +102,7 @@ specialroom/
 
 ## 6. 새로 만드는 방법 (다른 학교용)
 
-1. 코드 받기: `git clone https://github.com/shinkim0712/specialroom.git`
+1. 코드 받기: `git clone https://github.com/songlim26/specialroom.git`
 2. **Google Drive**에서 새 스프레드시트 생성 → 주소에서 시트 ID 복사
 3. 스프레드시트 → 확장 프로그램 → **Apps Script** → 내용 다 지우고 `apps-script/Code.gs` 붙여넣기
 4. 맨 위 두 줄 수정:
