@@ -1,7 +1,8 @@
 # 특별실 예약 관리 (학교용 웹앱)
 
 선생님들이 브라우저로 학교 특별실(강당·운동장·시청각실·도서관·컴퓨터실 등)을 예약하는 웹앱.
-서버 비용 없이 **GitHub Pages + Google Apps Script + Google Sheets**로 무료 운영.
+서버 비용 없이 **Vercel + Google Apps Script + Google Sheets**로 무료 운영.
+접속 주소: `sr-specialroom.vercel.app` · 소스: GitHub `shinkim0712/specialroom`
 
 > **자세한 내용은 [`GUIDE.md`](GUIDE.md)** — 구조·기능·설치·유지보수·인수인계를 하나부터 열까지 정리해뒀습니다.
 > 개발 메모: [`CONTEXT.md`](CONTEXT.md) · 변경 내역: [`CHANGELOG.md`](CHANGELOG.md)
@@ -29,7 +30,7 @@ http://localhost:8123 접속. 서버 없이도 모든 기능 동작 (localStorag
 
 ## 배포
 
-- **클라이언트**: 파일 수정 → `index.html`의 `?v=` 숫자 +1 → `git push` → 1~2분 뒤 자동 재배포
+- **클라이언트**: 파일 수정 → `index.html`의 `?v=` 숫자 +1 → `git push` → 1~2분 뒤 Vercel 자동 재배포
 - **서버(Code.gs)**: Apps Script 편집기에 붙여넣기 → 배포 관리 → 편집 → **버전 "새 버전"** → 배포
 
 ## 핵심 개념 3가지
@@ -47,4 +48,3 @@ http://localhost:8123 접속. 서버 없이도 모든 기능 동작 (localStorag
 | `dateRules` | 기간 정규시간 / 예약 금지 |
 | `holidays` | 학교자체 휴일 (법정공휴일은 `app.js`의 `KR_HOLIDAYS`에 하드코딩) |
 | `logs` | 변경 기록 (삭제·수정·가림) |
-| `schedule` | 죽은 탭 (2026-08-28 기능 제거) |
