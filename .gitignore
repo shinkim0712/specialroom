@@ -3,6 +3,10 @@
 # 로컬에서 실값을 넣고 작업할 일이 있으면 아래 파일명을 쓰세요 (추적 안 됨):
 apps-script/Code.local.gs
 
+# 개발용 내부 메모 — 로컬에만 두고 GitHub에는 안 올림
+CONTEXT.md
+CHANGELOG.md
+
 # Mac
 .DS_Store
 
