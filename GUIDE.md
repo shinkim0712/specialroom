@@ -2,8 +2,8 @@
 
 **이 문서 하나로 시스템을 이해하고, 새로 구축하고, 유지보수하고, 다음 담당자에게 넘길 수 있습니다.**
 
-- 최종 갱신: 2026-08-28
-- 코드 전체가 필요하면: GitHub `shinkim0712/specialroom` 저장소를 **Fork** 하거나 **초록색 Code 버튼 → Download ZIP**
+- 최종 갱신: 2026-08-30
+- 코드 전체가 필요하면: GitHub `songlim26/specialroom` 저장소를 **Fork** 하거나 **초록색 Code 버튼 → Download ZIP**
 - **이 문서 맨 뒤에 부록 A(서버 코드 전문)와 부록 B(설정값·운영 주소)가 있습니다.**
 
 ---
@@ -15,8 +15,8 @@
 | 항목 | 내용 |
 |---|---|
 | 상태 | 학교에서 실제 운영 중 |
-| 접속 주소 | Vercel (`sr-specialroom.vercel.app`) |
-| 소스 저장소 | GitHub `shinkim0712/specialroom` (여기에 반영하면 Vercel이 자동 재배포) |
+| 접속 주소 | Vercel (`specialroom-eight.vercel.app`) |
+| 소스 저장소 | GitHub `songlim26/specialroom` (여기에 반영하면 Vercel이 자동 재배포) |
 | 서버 실행 계정 | 처음 배포한 사람의 개인 Google 계정 (→ 9장 인수인계) |
 
 ---
@@ -108,7 +108,7 @@
 
 ### 6-1. 코드 받기
 
-1. 브라우저에서 `https://github.com/shinkim0712/specialroom` 접속
+1. 브라우저에서 `https://github.com/songlim26/specialroom` 접속
 2. 우측 상단 **Fork** 버튼 클릭 → 내 GitHub 계정으로 복사본이 생성됨 (`https://github.com/내아이디/specialroom`)
    - Fork를 쓰면 나중에 원본이 개선될 때 가져오기 쉽습니다.
    - Fork 대신 초록색 **Code → Download ZIP** 으로 파일만 받아도 됩니다.
@@ -808,17 +808,19 @@ const APP_CONFIG = {
 
 ### 현재 운영/테스트 정보
 
+아래 값들은 **배포하는 학교마다 다릅니다.** 각자 6장 절차대로 만든 뒤 자기 값으로 채워 넣으세요.
+현재 운영 중인 학교의 실제 주소·시트 ID·비밀번호는 **보안상 이 공개 문서에 넣지 않습니다** — 현재 담당자에게 직접 문의하세요.
+
 | 구분 | 값 |
 |---|---|
-| 접속 주소 | `https://sr-specialroom.vercel.app` |
-| 소스 저장소 | `https://github.com/shinkim0712/specialroom` |
-| 운영 서버 주소 (Vercel 환경변수 `APP_CONFIG_API_URL` 에 등록) | `https://script.google.com/macros/s/AKfycbxYOrmLo9opdrbxXmCsWshDWfhtzDBFyAT2WIFOO-RZHMsMj73fPpgyNH7tbXb8JOY/exec` |
-| 운영 구글시트 ID (운영 `Code.gs` 의 `SHEET_ID`) | `12XFU15WU8BylhAIF2FISd-mVpAQgr8Xvz1MU0iWIFHg` |
-| 테스트 서버 주소 | `https://script.google.com/macros/s/AKfycbxBID2kGhX5Tna7VjLbdLJIJ7qAcok3-9XifjflctLZfj5EWfxVR5NF_b5LxnVl950Atg/exec` |
-| 테스트 구글시트 ID | `1IY1woiMdLKPQOUYMNzWoMbVBAFnECMfDiQiOP9iH4Rk` (운영 시트의 사본) |
-| 관리자 비밀번호 | 이 문서에 없음. Apps Script 편집기의 `ADMIN_PW` 값. 현재 담당자에게 문의 |
+| 접속 주소 | `https://<프로젝트이름>.vercel.app` (6-6에서 정함) |
+| 소스 저장소 | `https://github.com/<내계정>/specialroom` (6-1에서 Fork) |
+| 운영 서버 주소 | `https://script.google.com/macros/s/…/exec` (6-4에서 발급 → Vercel 환경변수 `APP_CONFIG_API_URL` 에 등록) |
+| 운영 구글시트 ID | 6-2에서 만든 시트 URL의 `/d/` 와 `/edit` 사이 문자열 (Apps Script `Code.gs` 의 `SHEET_ID`) |
+| 테스트 서버/시트 | 운영 시트를 사본으로 복제 후 그 사본에 Apps Script 별도 배포 (8장) |
+| 관리자 비밀번호 | Apps Script 편집기의 `ADMIN_PW` 값. 현재 담당자에게 문의 |
 
-> 위 URL·시트는 **현재 담당자 계정**에 묶여 있습니다. 담당자가 바뀌면 전부 새 계정으로 다시 만들어야 하며(9장), 그 뒤 이 표를 새 값으로 갱신합니다.
+> 위 값들은 **각 담당자의 Google 계정**에 묶여 있습니다. 담당자가 바뀌면 전부 새 계정으로 다시 만들어야 합니다(9장).
 
 ### 교시 키값 (`period`)
 
