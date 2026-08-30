@@ -4,7 +4,7 @@
 서버 코드 전문·설정값·운영 정보가 모두 이 문서 안(부록)에 들어 있습니다.
 
 - 최종 갱신: 2026-08-28
-- 코드 전체가 필요하면: GitHub `shinkim0712/specialroom` 저장소를 **Fork** 하거나 **초록색 Code 버튼 → Download ZIP**
+- 코드 전체가 필요하면: GitHub `songlim26/specialroom` 저장소를 **Fork** 하거나 **초록색 Code 버튼 → Download ZIP**
 - 버전별 상세 변경 내역: [`CHANGELOG.md`](CHANGELOG.md) (참고용, 없어도 됨)
 
 ---
@@ -17,8 +17,8 @@
 |---|---|
 | 상태 | 학교에서 실제 운영 중 |
 | 접속 주소 | Vercel (`sr-specialroom.vercel.app`) |
-| 소스 저장소 | GitHub `shinkim0712/specialroom` (여기에 반영하면 Vercel이 자동 재배포) |
-| 서버 실행 계정 | 처음 배포한 사람의 개인 Google 계정 (→ 5장) |
+| 소스 저장소 | GitHub `songlim26/specialroom` (여기에 반영하면 Vercel이 자동 재배포) |
+| 서버 실행 계정 | 처음 배포한 사람의 개인 Google 계정 (→ 9장 인수인계) |
 
 ---
 
@@ -101,32 +101,110 @@
 
 ---
 
-## 6. 새로 만드는 방법 (다른 학교용)
+## 6. 새로 만드는 방법 (다른 학교에서 도입할 때)
 
-1. **코드 받기** — GitHub `shinkim0712/specialroom`를 Fork 하거나 Code 버튼 → Download ZIP
-2. **Google Drive**에서 새 스프레드시트 생성 → 주소창의 `/d/` 뒤 긴 문자열(시트 ID) 복사
-3. 스프레드시트 → 확장 프로그램 → **Apps Script** → 편집기 내용 다 지우고 **부록 A의 서버 코드**를 통째로 붙여넣기
-4. 붙여넣은 코드 맨 위 두 줄을 수정:
+준비물: 담당 교사의 Google 계정 1개, GitHub 계정 1개. 모두 무료.
+아래 순서대로 하면 약 20~30분 걸립니다.
+
+### 6-1. 코드 받기
+
+1. 브라우저에서 `https://github.com/songlim26/specialroom` 접속
+2. 우측 상단 **Fork** 버튼 클릭 → 내 GitHub 계정으로 복사본이 생성됨 (`https://github.com/내아이디/specialroom`)
+   - Fork를 쓰면 나중에 원본이 개선될 때 가져오기 쉽습니다.
+   - Fork 대신 초록색 **Code → Download ZIP** 으로 파일만 받아도 됩니다.
+3. 파일을 수정해야 하므로, Fork한 저장소를 내 컴퓨터로 받거나(`git clone`) GitHub 웹에서 직접 편집합니다.
+
+### 6-2. Google 스프레드시트 만들기 + 시트 ID 확인
+
+1. `https://sheets.new` 접속 (또는 Google Drive → 새로 만들기 → Google 스프레드시트)
+2. 이름은 아무거나 (예: `특별실예약DB`). 탭(reservations 등)은 **안 만들어도 됩니다** — 서버가 자동으로 만듭니다.
+3. **시트 ID는 주소창에서 확인합니다.** 스프레드시트를 열면 주소가 이렇게 생겼습니다:
+
+   `https://docs.google.com/spreadsheets/d/`**`1AbCdEf... (약 44자)`**`/edit#gid=0`
+
+   `/d/` 와 `/edit` 사이의 긴 문자열이 시트 ID입니다. **그 부분만** 복사해 둡니다.
+
+### 6-3. Apps Script에 서버 코드 넣기
+
+1. 그 스프레드시트 상단 메뉴 → **확장 프로그램 → Apps Script**
+2. 새 탭에 코드 편집기가 열립니다. 기본으로 있는 `function myFunction() { }` 를 **전체 선택(Ctrl/Cmd + A) → 삭제**
+3. **부록 A의 서버 코드 전체**를 복사해서 붙여넣습니다.
+4. 붙여넣은 코드 위쪽에서 이 두 줄을 찾습니다:
    ```js
-   const SHEET_ID = '2번에서 복사한 시트 ID';
-   const ADMIN_PW = '정할 관리자 비밀번호';
+   const SHEET_ID = '여기에_구글시트_ID_입력';
+   const ADMIN_PW = '여기에_관리자_비밀번호_입력';
    ```
-5. **배포 → 새 배포 → 웹앱** (실행: 나 / 액세스: 모든 사용자) → 발급된 `.../exec` 주소 복사
-   - 확인: 그 주소 뒤에 `?action=ping` 붙여 브라우저로 열어 `{"ok":true, ...}` 나오면 성공
-6. `config.js`를 수정 (아래 형태, 원본은 **부록 B**):
+   - **`SHEET_ID`** → 6-2에서 복사한 시트 ID로 교체
+     예: `const SHEET_ID = '1AbCdEf...';`
+     (서버가 어느 스프레드시트에 예약을 저장할지 알려주는 값입니다.)
+   - **`ADMIN_PW`** → 관리자 비밀번호를 원하는 값으로 정합니다
+     예: `const ADMIN_PW = 'school2026!';`
+     - **용도**: 사이트 우측 상단 "관리자 모드" 버튼을 눌렀을 때 입력하는 비밀번호입니다.
+     - **무엇을 잠그나**: 예약·수정·삭제는 비밀번호 없이 누구나 합니다. 이 비밀번호는 **특별실 추가/삭제, 학교휴일 관리, 변경 기록 조회, 구글시트 설정** 같은 "관리" 기능만 잠급니다.
+     - **안전한가**: 코드에 그대로 적히지만 서버(Google) 안에만 있고, 사용자 브라우저로는 전송되지 않습니다. 검증도 서버에서만 합니다.
+5. 편집기 상단 **저장** (디스크 아이콘, 또는 Ctrl/Cmd + S)
+
+### 6-4. Apps Script를 웹앱으로 배포
+
+1. 편집기 우측 상단 **배포 → 새 배포**
+2. 왼쪽 톱니바퀴(유형 선택) → **웹 앱** 선택
+3. 설정:
+   - 설명: 아무거나 (예: `v1`)
+   - **실행 계정: 나** (본인 계정)
+   - **액세스 권한: 모든 사용자**
+4. **배포** 클릭 → 처음이면 권한 승인 창이 뜹니다:
+   - "Google에서 확인하지 않은 앱입니다" 경고 → **고급** → **(안전하지 않음) 이동** → 권한 **허용**
+   - (본인이 만든 코드라 안전합니다. 이 경고는 개인 스크립트면 항상 나옵니다.)
+5. **웹 앱 URL**을 복사합니다: `https://script.google.com/macros/s/AKfy............/exec` 형태
+6. **확인**: 그 URL 뒤에 `?action=ping` 을 붙여 브라우저 새 탭으로 엽니다
+   → `{"ok":true,"ts":"..."}` 가 보이면 서버 정상입니다.
+
+### 6-5. 코드에 서버 주소 연결 (`config.js`)
+
+1. 6-1에서 받은 코드의 `config.js` 파일을 엽니다.
+2. 아래처럼 수정합니다 (원본 형태는 부록 B):
    ```js
    const APP_CONFIG = {
-     version: 3,        // 기존 숫자에서 +1
-     apiUrl: 'https://script.google.com/macros/s/.../exec',   // 5번에서 받은 주소
+     version: 3,          // 원래 숫자에서 +1 (원래 2였으면 3)
+     apiUrl: 'https://script.google.com/macros/s/AKfy............/exec',  // 6-4에서 복사한 웹 앱 URL
      serverEnabled: true,
      autoSave: true,
      autoLoad: true,
      autoLoadInterval: 60,
    };
    ```
-   `index.html`의 `<script src="config.js?v=2">`도 `config.js?v=3`으로 맞춤
-7. 코드를 GitHub에 올린 뒤 **Vercel**에서 Add New → Project → 그 저장소 Import (설정 그대로 Deploy)
-8. 배포된 주소로 접속 → 관리자 모드에서 특별실·정규시간표·학교휴일 등록
+3. `index.html` 을 열어 `<script src="config.js?v=2">` 를 찾아 **`config.js?v=3`** 으로 바꿉니다 (위 `version` 숫자와 똑같이 맞춤).
+4. 저장하고 GitHub에 반영:
+   - GitHub 웹에서 편집했으면 각 파일에서 **Commit changes**
+   - 내 컴퓨터에서 편집했으면:
+     ```bash
+     git add -A && git commit -m "우리 학교 설정" && git push
+     ```
+
+### 6-6. Vercel에 배포
+
+1. `https://vercel.com` 접속 → **Sign Up** (또는 로그인). **Continue with GitHub** 로 GitHub 계정 연결을 권장합니다.
+2. Vercel 대시보드 → **Add New... → Project**
+3. **Import Git Repository** 목록에서 6-1의 `specialroom` 저장소를 찾아 **Import**
+   - 목록에 안 보이면 **Adjust GitHub App Permissions** → 그 저장소 접근을 허용한 뒤 새로고침
+4. 설정 화면 (대부분 자동으로 잡힘):
+   - **Framework Preset**: `Other`
+   - **Root Directory**: 그대로 (`./`)
+   - **Build and Output Settings**: **건드리지 않음** (빌드 과정이 없는 정적 사이트입니다)
+5. **Deploy** 클릭 → 1~2분 뒤 완료
+6. 완료 화면 또는 프로젝트 페이지에서 **도메인** 확인: `https://specialroom-xxxx.vercel.app`
+   - 더 짧은 주소를 원하면 프로젝트 → **Settings → Domains** 에서 추가·변경
+7. 이후 GitHub에 push 하면 Vercel이 **자동으로 다시 배포**합니다. 따로 할 일 없습니다.
+
+### 6-7. 접속 주소 공유 + 초기 데이터 입력
+
+1. 6-6의 Vercel 주소를 교직원에게 공유합니다.
+2. 그 주소로 접속 → 우측 상단 **관리자 모드** → 6-3에서 정한 비밀번호 입력
+3. 등록:
+   - **특별실**: 탭 줄 맨 끝 `+ 특별실 추가`
+   - **정규시간표**: `기간 정규시간` 버튼 → 특별실·기간·요일·교시·라벨 입력
+   - **학교휴일**: `학교휴일 관리` → 방학·재량휴업일·개교기념일 등
+4. 법정공휴일은 자동으로 표시됩니다. 단 `app.js`의 `KR_HOLIDAYS` 목록이 2028년까지라, 2029년이 되기 전에 새 연도 공휴일을 추가하고 `app.js?v=` 번호를 올려 push 해야 합니다.
 
 ---
 
@@ -139,52 +217,84 @@ git add -A && git commit -m "수정 내용" && git push
 # 1~2분 뒤 Vercel 자동 반영
 ```
 로컬 미리보기: `python3 -m http.server 8123 --directory specialroom` → http://localhost:8123
-(서버 기능 테스트는 반드시 테스트 전용 시트로 → 8장)
+(서버 기능을 시험할 때는 반드시 테스트 전용 시트로 → 8장)
 
 ### 서버 (Code.gs)
-1. 서버 코드를 수정합니다. 저장소 파일은 `apps-script/Code.gs`이고, **부록 A**에도 전문이 실려 있습니다 — 수정하면 둘 다 갱신합니다(둘이 다르면 파일이 기준).
-2. 수정한 전체 코드를 Apps Script 편집기에 붙여넣고, 맨 위 `SHEET_ID` / `ADMIN_PW` 두 줄을 그 환경 값으로 다시 수정 → 저장
-3. **배포 → 배포 관리 → 편집 → 버전 "새 버전" → 배포**
-   - "새 버전"을 안 고르면 코드가 안 바뀜 (가장 흔한 실수)
-   - "새 배포"를 하면 주소가 바뀌므로 하지 말 것
+1. 서버 코드를 수정합니다. 저장소 파일은 `apps-script/Code.gs`이고 부록 A에도 같은 내용이 실려 있으니, 수정하면 둘 다 갱신합니다(둘이 다르면 파일이 기준).
+2. 수정한 전체 코드를 Apps Script 편집기에 붙여넣고, 맨 위 `SHEET_ID` / `ADMIN_PW` 두 줄을 그 환경 값으로 다시 채웁니다 → 저장
+3. **배포 → 배포 관리 → 편집(연필 아이콘) → 버전 "새 버전" → 배포**
+   - "새 버전"을 안 고르면 코드가 안 바뀝니다 (가장 흔한 실수)
+   - "새 배포"를 하면 웹 앱 주소가 바뀌므로 하지 않습니다
 
 ---
 
-## 8. 테스트 규칙
+## 8. 테스트 (기능을 시험할 때)
 
-이 앱은 학교에서 실제 운영 중이라 잘못 건드리면 진짜 예약이 사라집니다(2026-08-27에 예약·휴일이 삭제된 사고 있었음). 그래서 **운영과 완전히 분리된 테스트 전용 시트·Apps Script**를 따로 두었습니다(주소는 부록 B).
+운영 중인 예약을 실수로 건드리지 않도록, **운영과 완전히 분리된 테스트 전용 시트·Apps Script**를 따로 둡니다 (주소는 부록 B).
 
-- 브라우저 콘솔에서 `localStorage.setItem('apiUrl', '테스트 Apps Script 주소'); location.reload();` 로 전환
-- 끝나면 `localStorage.removeItem('apiUrl'); location.reload();` 로 운영 복귀
-- 운영 서버에는 조회(`ping`, `loadAll`)만, 저장·삭제 테스트는 하지 않음
-- 담당자가 바뀌면 테스트 환경도 새 계정으로 다시 만들어야 함(9장)
+- 브라우저 개발자 콘솔(F12)에서 전환:
+  ```js
+  localStorage.setItem('apiUrl', '테스트 Apps Script 주소');
+  location.reload();
+  ```
+- 끝나면 운영으로 복귀:
+  ```js
+  localStorage.removeItem('apiUrl');
+  location.reload();
+  ```
+- 운영 서버에는 조회(`ping`, `loadAll`)만 합니다. 저장·삭제 테스트는 테스트 서버에서만.
+- 담당자가 바뀌면 테스트 환경도 새 계정으로 다시 만듭니다 (9장).
 
 ---
 
 ## 9. 인수인계 (담당자가 바뀔 때)
 
-서버는 **처음 배포한 사람의 Google 계정으로 실행**됩니다. 그 계정이 정지되면(전근·퇴직) 서버가 멈추므로, 담당자가 바뀌면 **새 담당자 계정으로 서버를 다시 배포**해야 합니다.
+### 9-1. 왜 필요한가
 
-1. 새 담당자가 자기 Google Drive에 새 스프레드시트 생성
-2. 확장 프로그램 → Apps Script → **부록 A의 서버 코드** 붙여넣기 → `SHEET_ID`, `ADMIN_PW` 수정
-3. 배포 → 새 배포 → 웹앱(실행: 나 / 액세스: 모든 사용자) → `.../exec` 주소 복사
-4. `config.js`의 `apiUrl`을 새 주소로, `version` +1. `index.html`의 `config.js?v=` 도 +1
-5. `git commit && git push` → 1~2분 뒤 모든 사용자가 자동으로 새 시트에 연결됨 (사용자는 아무 조치 불필요)
-6. 특별실·정규시간표·학교휴일을 관리자 모드에서 다시 등록
-   - 데이터를 이어받으려면: 기존 스프레드시트를 **파일 → 사본 만들기**로 새 담당자 Drive에 복사한 뒤, 그 사본 ID를 새 `SHEET_ID`에 넣기
-7. 테스트 전용 시트·Apps Script도 같은 방식으로 새 계정에 다시 만들기
+서버(Apps Script)는 **처음 배포한 사람의 Google 계정 권한으로 실행**됩니다. 그 계정이 전근·퇴직으로 정지·삭제되면 서버가 멈춰 예약이 안 됩니다. 그래서 담당자가 바뀌면 **후임 담당자 계정으로 서버를 처음부터 새로 배포**해야 합니다.
 
----
+### 9-2. 전임 담당자가 넘겨줄 것
 
-## 10. 알아둘 제약
+- 이 인수인계서 (부록 A 서버 코드, 부록 B 설정·주소 포함)
+- **현재 관리자 비밀번호** (`ADMIN_PW` 값) — 문서에 없으니 따로 알려줌
+- GitHub 저장소 위치 (후임이 Fork 하거나 협업자로 추가)
+- 기존 예약 데이터를 이어받을지 여부 결정
 
-| 항목 | 내용 |
-|---|---|
-| 특별실 삭제 건수 | 관리자 모드는 자동 새로고침이 꺼져 있어, 삭제 확인창의 "예약 N건 함께 삭제" 숫자가 최신이 아닐 수 있음. 삭제 전 사용자 모드로 나갔다 오거나 "서버에서 불러오기"로 갱신하면 안전 |
-| 학교휴일 기간 겹침 | 검사하지 않음 |
-| 예약 금지 차단 | 브라우저 화면에서만 막음 (서버 API 직접 호출은 안 막음, 일반 사용 시 문제 없음) |
-| 브라우저 저장 용량 | 예약 수천 건 이상 쌓이면 한계에 닿을 수 있음. 오래된 예약은 주기적으로 정리 |
-| 저장소에 주소 노출 | `config.js`·문서에 시트 ID와 Apps Script 주소가 있음. Apps Script 주소는 원래 공개라 문제없음. **`Code.gs`의 `SHEET_ID`·`ADMIN_PW`는 플레이스홀더 상태로만 커밋** — 실제 값은 Apps Script 편집기에만 입력하고 절대 커밋하지 말 것 |
+### 9-3. 절차 — 기존 데이터를 이어받지 않는 경우 (가장 단순)
+
+새로 시작하고 특별실·정규시간표·휴일만 다시 등록하는 방식입니다.
+
+1. **후임 담당자**가 자기 Google Drive에 새 스프레드시트 생성 (6-2 참고, 시트 ID 확인)
+2. 확장 프로그램 → Apps Script → 기본 코드 삭제 → **부록 A** 붙여넣기 (6-3 참고)
+3. `SHEET_ID` = 새 시트 ID / `ADMIN_PW` = 기존 값 그대로 쓰거나 새로 정함 → 저장
+4. 배포 → 새 배포 → 웹앱 (실행: 나 / 액세스: 모든 사용자) → 새 `.../exec` 주소 복사 (6-4 참고)
+5. `config.js`의 `apiUrl`을 새 주소로 교체, `version` +1. `index.html`의 `config.js?v=` 도 +1
+6. GitHub에 commit + push
+7. **Vercel 처리** (둘 중 하나):
+   - 후임이 저장소를 **새로 Fork** 했으면 → Vercel에서 그 저장소로 새 프로젝트 Import (6-6 참고). **접속 주소가 바뀌므로 교직원에게 새 주소를 공지**합니다.
+   - 후임이 **기존 저장소를 그대로** 물려받으면(협업자 권한) → push만으로 기존 Vercel이 자동 재배포. **접속 주소 그대로 유지**됩니다.
+8. 접속 → 관리자 모드(새 `ADMIN_PW`) → 특별실·정규시간표·학교휴일 다시 등록
+9. **테스트 전용 시트·Apps Script**도 위 1~4를 별도 스프레드시트로 반복해 후임 계정에 다시 만듭니다
+10. 후임이 **부록 B의 URL·시트 ID 표를 새 값으로 갱신**하고 commit
+
+### 9-4. 절차 — 기존 예약 데이터를 이어받는 경우
+
+위 3번에서 새 시트를 만드는 대신:
+
+1. 전임 담당자가 자기 스프레드시트에서 **파일 → 사본 만들기**
+   - 사본 저장 위치를 후임 담당자 Drive(또는 공유 폴더)로 지정
+   - 또는 전임이 시트를 후임에게 "편집자"로 공유한 뒤, 후임이 사본 생성
+2. 그 사본의 시트 ID를 후임 `Code.gs`의 `SHEET_ID`에 입력
+3. 나머지는 9-3의 4번부터 동일
+
+→ 예약·정규시간·학교휴일·변경 기록이 그대로 유지됩니다.
+
+### 9-5. 확인
+
+- 새 `.../exec?action=ping` → `{"ok":true, ...}`
+- 사이트 접속 → 예약 하나 만들어 보고 새로고침 → 그대로 남아 있으면 정상
+- 관리자 모드에 새 비밀번호로 진입되는지 확인
+- (데이터 이어받은 경우) 기존 예약·정규시간표가 보이는지 확인
 
 ---
 
@@ -717,7 +827,7 @@ const APP_CONFIG = {
 | 구분 | 값 |
 |---|---|
 | 접속 주소 | `https://sr-specialroom.vercel.app` |
-| 소스 저장소 | `https://github.com/shinkim0712/specialroom` |
+| 소스 저장소 | `https://github.com/songlim26/specialroom` |
 | 운영 Apps Script URL | `https://script.google.com/macros/s/AKfycbxYOrmLo9opdrbxXmCsWshDWfhtzDBFyAT2WIFOO-RZHMsMj73fPpgyNH7tbXb8JOY/exec` |
 | 운영 구글시트 ID | `12XFU15WU8BylhAIF2FISd-mVpAQgr8Xvz1MU0iWIFHg` |
 | 테스트 Apps Script URL | `https://script.google.com/macros/s/AKfycbxBID2kGhX5Tna7VjLbdLJIJ7qAcok3-9XifjflctLZfj5EWfxVR5NF_b5LxnVl950Atg/exec` |
