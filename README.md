@@ -2,7 +2,7 @@
 
 선생님들이 브라우저로 학교 특별실(강당·운동장·시청각실·도서관·컴퓨터실 등)을 예약하는 웹앱.
 서버 비용 없이 **Vercel + Google Apps Script + Google Sheets**로 무료 운영.
-접속 주소: `specialroom-eight.vercel.app` · 소스: GitHub `songlim26/specialroom`
+접속 주소: `sr-specialroom.vercel.app` · 소스: GitHub `shinkim0712/specialroom`
 
 > **자세한 내용은 `GUIDE.md`** — 구조·기능·설치·유지보수·인수인계를 하나부터 열까지 정리해뒀습니다.
 > `GUIDE.md` 맨 뒤 부록에 서버 코드 전문(Code.gs)과 설정값·운영 주소가 모두 들어 있습니다.

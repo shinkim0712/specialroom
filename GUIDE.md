@@ -3,7 +3,7 @@
 **이 문서 하나로 시스템을 이해하고, 새로 구축하고, 유지보수하고, 다음 담당자에게 넘길 수 있습니다.**
 
 - 최종 갱신: 2026-08-28
-- 코드 전체가 필요하면: GitHub `songlim26/specialroom` 저장소를 **Fork** 하거나 **초록색 Code 버튼 → Download ZIP**
+- 코드 전체가 필요하면: GitHub `shinkim0712/specialroom` 저장소를 **Fork** 하거나 **초록색 Code 버튼 → Download ZIP**
 - **이 문서 맨 뒤에 부록 A(서버 코드 전문)와 부록 B(설정값·운영 주소)가 있습니다.**
 
 ---
@@ -15,8 +15,8 @@
 | 항목 | 내용 |
 |---|---|
 | 상태 | 학교에서 실제 운영 중 |
-| 접속 주소 | Vercel (`specialroom-eight.vercel.app`) |
-| 소스 저장소 | GitHub `songlim26/specialroom` (여기에 반영하면 Vercel이 자동 재배포) |
+| 접속 주소 | Vercel (`sr-specialroom.vercel.app`) |
+| 소스 저장소 | GitHub `shinkim0712/specialroom` (여기에 반영하면 Vercel이 자동 재배포) |
 | 서버 실행 계정 | 처음 배포한 사람의 개인 Google 계정 (→ 9장 인수인계) |
 
 ---
@@ -108,7 +108,7 @@
 
 ### 6-1. 코드 받기
 
-1. 브라우저에서 `https://github.com/songlim26/specialroom` 접속
+1. 브라우저에서 `https://github.com/shinkim0712/specialroom` 접속
 2. 우측 상단 **Fork** 버튼 클릭 → 내 GitHub 계정으로 복사본이 생성됨 (`https://github.com/내아이디/specialroom`)
    - Fork를 쓰면 나중에 원본이 개선될 때 가져오기 쉽습니다.
    - Fork 대신 초록색 **Code → Download ZIP** 으로 파일만 받아도 됩니다.
@@ -810,8 +810,8 @@ const APP_CONFIG = {
 
 | 구분 | 값 |
 |---|---|
-| 접속 주소 | `https://specialroom-eight.vercel.app` |
-| 소스 저장소 | `https://github.com/songlim26/specialroom` |
+| 접속 주소 | `https://sr-specialroom.vercel.app` |
+| 소스 저장소 | `https://github.com/shinkim0712/specialroom` |
 | 운영 서버 주소 (Vercel 환경변수 `APP_CONFIG_API_URL` 에 등록) | `https://script.google.com/macros/s/AKfycbxYOrmLo9opdrbxXmCsWshDWfhtzDBFyAT2WIFOO-RZHMsMj73fPpgyNH7tbXb8JOY/exec` |
 | 운영 구글시트 ID (운영 `Code.gs` 의 `SHEET_ID`) | `12XFU15WU8BylhAIF2FISd-mVpAQgr8Xvz1MU0iWIFHg` |
 | 테스트 서버 주소 | `https://script.google.com/macros/s/AKfycbxBID2kGhX5Tna7VjLbdLJIJ7qAcok3-9XifjflctLZfj5EWfxVR5NF_b5LxnVl950Atg/exec` |
