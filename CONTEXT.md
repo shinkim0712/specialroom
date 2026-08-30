@@ -65,11 +65,11 @@ UI/기능이 바뀌는 작업은 코드를 바로 고치지 말고, 먼저 "지�
 ├── app.js          전체 클라이언트 로직 (제일 큼, ~1450줄)
 ├── api.js          Apps Script 통신
 ├── config.js       구글시트 연결 URL·자동연결 설정 (git 추적됨, 운영 URL 하드코딩)
-├── .gitignore      apps-script/ 제외
+├── .gitignore      .DS_Store / .vscode / apps-script/Code.local.gs 만 제외
 ├── README.md       설치·관리자·인수인계 안내
 ├── CONTEXT.md      이 파일
 └── apps-script/
-    └── Code.gs     서버 코드 (Apps Script에 붙여넣기용, git 제외 — 시트ID·비번 노출 방지)
+    └── Code.gs     서버 코드 (저장소에 포함 — 플레이스홀더만. 실값은 Apps Script 편집기에만)
 ```
 로컬 프리뷰: `.claude/launch.json`에 `specialroom` 설정 있음 (`python3 -m http.server 8123 --directory specialroom`).
 
@@ -224,7 +224,7 @@ Code.gs를 바꿨다면 git push와 별개로 **Apps Script 편집기에 직접 
 - ✅ (2026-08-28 수정, 배포 대기) 특별실 삭제 시 그 방의 예약·정규시간·기간규칙도 함께 삭제 (`deleteRoom`이 서버에서 4개 시트 정리, 클라이언트도 동일)
 
 ## 남은 작업 / TODO
-- [ ] **2026-08-28 작업 Code.gs 배포** (맨 위 "배포 대기" 참고) — `deleteRoom` cascade purge 포함
-- [ ] 설정창 `CODE_GS` 문자열 사본을 실제 `apps-script/Code.gs`와 동기화 (이미 어긋나 있고 이번에 액션 6개+cascade만큼 더 벌어짐) — 또는 "Code.gs 보기/복사" 기능 자체를 제거하고 저장소 파일로 안내
+- [ ] songlim26로 포크 후 이 로컬 저장소 remote 변경 + Vercel 재연결
 - [ ] 2029년 되면 `KR_HOLIDAYS`에 새 연도 공휴일 추가
 - [ ] (선택) 학교자체 휴일 겹침 시 경고 추가할지 결정
+- [ ] (보류) 위험분석 #1 — 특별실 삭제 확인창 건수를 서버에서 재조회

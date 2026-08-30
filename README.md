@@ -17,7 +17,7 @@ specialroom/
 ├── api.js          Apps Script 통신
 ├── app.js          ★ 전체 클라이언트 로직
 └── apps-script/
-    └── Code.gs     서버 코드 (Apps Script에 붙여넣기용, .gitignore로 제외)
+    └── Code.gs     서버 코드 (저장소에 포함, 플레이스홀더만). Apps Script 편집기에 붙여넣어 사용
 ```
 
 ## 로컬 실행

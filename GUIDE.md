@@ -43,7 +43,7 @@ specialroom/
 ├── config.js    구글시트 연결 주소. 이 파일의 apiUrl만 바꾸면 다른 시트로 연결됨
 ├── api.js       서버 통신 함수
 ├── app.js       클라이언트 전체 로직
-└── apps-script/Code.gs   서버 코드 (저장소에서 제외 — 시트 ID·관리자 비번 포함)
+└── apps-script/Code.gs   서버 코드 (저장소에 포함, 플레이스홀더만). Apps Script 편집기에 붙여넣어 사용
 ```
 
 > **CSS·JS를 고치면 `index.html`에 있는 그 파일의 `?v=` 번호를 1 올려야** 브라우저가 새 파일을 받습니다.
@@ -172,4 +172,4 @@ git add -A && git commit -m "수정 내용" && git push
 | 학교휴일 기간 겹침 | 검사하지 않음 |
 | 예약 금지 차단 | 브라우저 화면에서만 막음 (서버 API 직접 호출은 안 막음, 일반 사용 시 문제 없음) |
 | 브라우저 저장 용량 | 예약 수천 건 이상 쌓이면 한계에 닿을 수 있음. 오래된 예약은 주기적으로 정리 |
-| 저장소에 주소 노출 | `config.js`·문서에 시트 ID와 Apps Script 주소가 있음. Apps Script 주소는 원래 공개라 문제없음. 관리자 비밀번호는 저장소에서 제외된 `Code.gs`에만 있음 — 이 상태 유지 |
+| 저장소에 주소 노출 | `config.js`·문서에 시트 ID와 Apps Script 주소가 있음. Apps Script 주소는 원래 공개라 문제없음. **`Code.gs`의 `SHEET_ID`·`ADMIN_PW`는 플레이스홀더 상태로만 커밋** — 실제 값은 Apps Script 편집기에만 입력하고 절대 커밋하지 말 것 |
