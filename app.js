@@ -800,6 +800,7 @@ document.getElementById('saveSettingsBtn').onclick = () => {
   localStorage.setItem('autoLoad', document.getElementById('autoLoad').checked ? '1' : '0');
   localStorage.setItem('autoLoadInterval', document.getElementById('autoLoadInterval').value);
   setupAutoLoad();
+  updateNoServerBanner();
   closeAllModals();
   alert('설정이 저장되었습니다.');
 };
@@ -1343,21 +1344,36 @@ document.getElementById('monthTodayBtn').onclick = () => {
   renderMonthView();
 };
 
+// config.js 의 apiUrl 은 Vercel 빌드 때 환경변수(APP_CONFIG_API_URL)로 주입됨.
+// 주입 안 됐거나('__API_URL__' 그대로) 빈 값이면 = 서버 미설정 → 서버 연동 없이 로컬 전용으로 동작.
+// (저장소를 포크한 사이트가 원본 서버·시트에 붙는 것을 방지)
+function configApiUrl() {
+  const u = (typeof APP_CONFIG !== 'undefined' && APP_CONFIG.apiUrl) || '';
+  return u.indexOf('__API_URL__') === -1 ? u : '';
+}
+
 // config.js 값을 localStorage에 적용. config version이 바뀌면 모든 브라우저에 다시 적용.
 // (같은 version 안에서는 사용자가 설정창에서 바꾼 값이 유지됨)
 function seedConfigDefaults() {
   if (typeof APP_CONFIG === 'undefined') return;
   if (localStorage.getItem('configVersion') === String(APP_CONFIG.version)) return;
-  localStorage.setItem('apiUrl', APP_CONFIG.apiUrl);
-  localStorage.setItem('serverEnabled', APP_CONFIG.serverEnabled ? '1' : '0');
+  const url = configApiUrl();
+  localStorage.setItem('apiUrl', url);
+  localStorage.setItem('serverEnabled', (url && APP_CONFIG.serverEnabled) ? '1' : '0');
   localStorage.setItem('autoSave', APP_CONFIG.autoSave ? '1' : '0');
   localStorage.setItem('autoLoad', APP_CONFIG.autoLoad ? '1' : '0');
   localStorage.setItem('autoLoadInterval', String(APP_CONFIG.autoLoadInterval));
   localStorage.setItem('configVersion', String(APP_CONFIG.version));
 }
 
+function updateNoServerBanner() {
+  const banner = document.getElementById('noServerBanner');
+  if (banner) banner.hidden = !!(API.enabled() && API.url());
+}
+
 function init() {
   seedConfigDefaults();
+  updateNoServerBanner();
   if (!state.currentRoom) state.currentRoom = state.rooms[0] || null;
   if (state.isAdmin) document.body.classList.add('admin');
   updateAdminBtnLabel();

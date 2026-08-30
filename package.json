@@ -1,0 +1,9 @@
+{
+  "name": "specialroom",
+  "version": "1.0.0",
+  "private": true,
+  "description": "학교 특별실 예약 관리 웹앱 (정적 사이트 + Google Apps Script)",
+  "scripts": {
+    "build": "node build.js"
+  }
+}

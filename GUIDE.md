@@ -41,7 +41,8 @@
 |---|---|
 | `index.html` | 화면 뼈대와 팝업 |
 | `style.css` | 디자인 |
-| `config.js` | 구글시트 연결 주소. `apiUrl`만 바꾸면 다른 시트로 연결됨 (내용은 문서 맨 뒤 부록 B) |
+| `config.js` | 앱 설정. 서버 주소(`apiUrl`)는 여기 안 두고 Vercel 환경변수 `APP_CONFIG_API_URL` 로 주입 (내용은 문서 맨 뒤 부록 B) |
+| `build.js` `package.json` `vercel.json` | Vercel 빌드 때 환경변수를 `config.js` 에 넣어주는 설정 |
 | `api.js` | 서버 통신 함수 |
 | `app.js` | 클라이언트 전체 로직 |
 | `apps-script/Code.gs` | 서버 코드 (전문은 문서 맨 뒤 부록 A) |
@@ -158,44 +159,28 @@
 6. **확인**: 그 URL 뒤에 `?action=ping` 을 붙여 브라우저 새 탭으로 엽니다
    → `{"ok":true,"ts":"..."}` 가 보이면 서버 정상입니다.
 
-### 6-5. 코드에 서버 주소 연결 (`config.js`) — 반드시 필요
+### 6-5. (참고) 서버 주소는 코드에 넣지 않습니다
 
-**이 단계를 건너뛰면 새로 만든 사이트가 원래 학교의 서버에 연결되어 예약이 엉뚱한 곳에 저장됩니다.** 새 사이트를 방금 만든 내 서버(6-4)로 연결하는 단계입니다.
+`config.js` 의 `apiUrl` 은 빈 자리표시자(`__API_URL__`)로 두고, **다음 단계(6-6)에서 Vercel 환경변수로 등록**합니다.
+이렇게 하면 GitHub 저장소 어디에도 서버 주소가 없어서, 이 저장소를 포크한 다른 사람이 원본 서버·시트에 붙지 못합니다. `config.js` 를 직접 고칠 필요 없습니다.
 
-1. 6-1에서 받은 코드의 `config.js` 파일을 엽니다.
-2. 아래처럼 수정합니다 (원본 형태는 이 문서 맨 뒤 「부록 B」):
-   ```js
-   const APP_CONFIG = {
-     version: 3,          // 원래 숫자에서 +1 (원래 2였으면 3)
-     apiUrl: 'https://script.google.com/macros/s/AKfy............/exec',  // 6-4에서 복사한 웹 앱 URL
-     serverEnabled: true,
-     autoSave: true,
-     autoLoad: true,
-     autoLoadInterval: 60,
-   };
-   ```
-3. `index.html` 을 열어 `<script src="config.js?v=2">` 를 찾아 **`config.js?v=3`** 으로 바꿉니다 (위 `version` 숫자와 똑같이 맞춤).
-4. 저장하고 GitHub에 반영:
-   - GitHub 웹에서 편집했으면 각 파일에서 **Commit changes**
-   - 내 컴퓨터에서 편집했으면:
-     ```bash
-     git add -A && git commit -m "우리 학교 설정" && git push
-     ```
+### 6-6. Vercel에 배포 + 서버 주소 등록
 
-### 6-6. Vercel에 배포
-
-1. `https://vercel.com` 접속 → **Sign Up** (또는 로그인). **Continue with GitHub** 로 GitHub 계정 연결을 권장합니다.
-2. Vercel 대시보드 → **Add New... → Project**
-3. **Import Git Repository** 목록에서 6-1의 `specialroom` 저장소를 찾아 **Import**
-   - 목록에 안 보이면 **Adjust GitHub App Permissions** → 그 저장소 접근을 허용한 뒤 새로고침
-4. 설정 화면 (대부분 자동으로 잡힘):
-   - **Framework Preset**: `Other`
-   - **Root Directory**: 그대로 (`./`)
-   - **Build and Output Settings**: **건드리지 않음** (빌드 과정이 없는 정적 사이트입니다)
-5. **Deploy** 클릭 → 1~2분 뒤 완료
-6. 완료 화면 또는 프로젝트 페이지에서 **도메인** 확인: `https://specialroom-xxxx.vercel.app`
-   - 더 짧은 주소를 원하면 프로젝트 → **Settings → Domains** 에서 추가·변경
-7. 이후 GitHub에 push 하면 Vercel이 **자동으로 다시 배포**합니다. 따로 할 일 없습니다.
+1. `https://vercel.com` 접속 → **Sign Up** (**Continue with GitHub** 권장)
+2. 대시보드 → **Add New... → Project**
+3. **Import Git Repository** 목록에서 6-1의 `specialroom` 저장소를 **Import**
+   - 목록에 안 보이면 **Adjust GitHub App Permissions** → 그 저장소 접근 허용 후 새로고침
+4. Import 후 설정 화면에서 **Environment Variables** 를 펼치고 아래를 추가:
+   | Name | Value |
+   |---|---|
+   | `APP_CONFIG_API_URL` | 6-4에서 복사한 웹 앱 URL (`https://script.google.com/macros/s/.../exec`) |
+   - **Add** 클릭
+5. Framework / Build 설정은 저장소의 `vercel.json` 에 이미 들어 있으니 **건드리지 않습니다.**
+6. **Deploy** 클릭 → 1~2분 뒤 완료
+7. 도메인 확인: `https://specialroom-xxxx.vercel.app` (프로젝트 → **Settings → Domains** 에서 변경 가능)
+8. 접속했을 때 화면 위에 노란 **"서버에 연결되어 있지 않습니다"** 배너가 **안 뜨면 정상**입니다.
+   - 뜨면: 4번 환경변수 이름/값을 다시 확인 → **Deployments → 최신 → ⋯ → Redeploy**
+9. 이후 GitHub에 push 하면 자동으로 다시 배포됩니다. (환경변수를 나중에 바꿨을 때만 수동 Redeploy 필요)
 
 ### 6-7. 접속 주소 공유 + 초기 데이터 입력
 
@@ -218,7 +203,7 @@ git add -A && git commit -m "수정 내용" && git push
 # 1~2분 뒤 Vercel 자동 반영
 ```
 로컬 미리보기: `python3 -m http.server 8123 --directory specialroom` → http://localhost:8123
-(서버 기능을 시험할 때는 반드시 테스트 전용 시트로 → 8장)
+로컬에서는 `config.js` 가 `__API_URL__` 이라 **서버 꺼진 채로** 뜹니다("서버 미연결" 배너). 서버 붙이려면 8장 방식으로 콘솔/설정창에 **테스트** 주소를 넣습니다.
 
 ### 서버 (Code.gs)
 1. 서버 코드를 수정합니다. 저장소 파일은 `apps-script/Code.gs`이고 부록 A에도 같은 내용이 실려 있으니, 수정하면 둘 다 갱신합니다(둘이 다르면 파일이 기준).
@@ -269,14 +254,12 @@ git add -A && git commit -m "수정 내용" && git push
 2. 확장 프로그램 → Apps Script → 기본 코드 삭제 → **부록 A** 붙여넣기 (6-3 참고)
 3. `SHEET_ID` = 새 시트 ID / `ADMIN_PW` = 기존 값 그대로 쓰거나 새로 정함 → 저장
 4. 배포 → 새 배포 → 웹앱 (실행: 나 / 액세스: 모든 사용자) → 새 `.../exec` 주소 복사 (6-4 참고)
-5. `config.js`의 `apiUrl`을 새 주소로 교체, `version` +1. `index.html`의 `config.js?v=` 도 +1
-6. GitHub에 commit + push
-7. **Vercel 처리** (둘 중 하나):
-   - 후임이 저장소를 **새로 Fork** 했으면 → Vercel에서 그 저장소로 새 프로젝트 Import (6-6 참고). **접속 주소가 바뀌므로 교직원에게 새 주소를 공지**합니다.
-   - 후임이 **기존 저장소를 그대로** 물려받으면(협업자 권한) → push만으로 기존 Vercel이 자동 재배포. **접속 주소 그대로 유지**됩니다.
-8. 접속 → 관리자 모드(새 `ADMIN_PW`) → 특별실·정규시간표·학교휴일 다시 등록
-9. **테스트 전용 시트·Apps Script**도 위 1~4를 별도 스프레드시트로 반복해 후임 계정에 다시 만듭니다
-10. 후임이 **부록 B의 URL·시트 ID 표를 새 값으로 갱신**하고 commit
+5. **Vercel 처리** (둘 중 하나):
+   - 후임이 저장소를 **새로 Fork** 했으면 → Vercel에서 그 저장소로 새 프로젝트 Import (6-6 참고). 이때 환경변수 `APP_CONFIG_API_URL` 에 4번의 새 주소를 넣음. **접속 주소가 바뀌므로 교직원에게 공지**.
+   - 후임이 **기존 저장소·기존 Vercel 프로젝트를 그대로** 물려받으면 → Vercel 프로젝트 → **Settings → Environment Variables** 에서 `APP_CONFIG_API_URL` 값을 4번의 새 주소로 교체 → **Deployments → 최신 → Redeploy**. **접속 주소 그대로 유지**.
+6. 접속 → 관리자 모드(새 `ADMIN_PW`) → 특별실·정규시간표·학교휴일 다시 등록
+7. **테스트 전용 시트·Apps Script**도 위 1~4를 별도 스프레드시트로 반복해 후임 계정에 다시 만듭니다
+8. 후임이 **부록 B의 URL·시트 ID 표를 새 값으로 갱신**하고 commit
 
 ### 9-4. 절차 — 기존 예약 데이터를 이어받는 경우
 
@@ -806,22 +789,22 @@ function dateRuleSummary(r) {
 
 ## 부록 B. 설정 파일과 현재 운영 정보
 
-### `config.js` 원본
+### `config.js` 원본 (저장소 그대로)
 
 ```javascript
-// ===== 앱 설정 (구글시트 연결) =====
-// 다른 구글시트로 바꿀 때는 apiUrl 을 새 Apps Script URL(.../exec)로 교체하고 version 을 +1.
-// version 을 올려야 기존 사용자 브라우저에도 새 URL 이 적용됨.
-// index.html 의 <script src="config.js?v=N"> 의 N 도 함께 +1 (캐시 방지).
 const APP_CONFIG = {
-  version: 2,
-  apiUrl: 'https://script.google.com/macros/s/AKfycbxYOrmLo9opdrbxXmCsWshDWfhtzDBFyAT2WIFOO-RZHMsMj73fPpgyNH7tbXb8JOY/exec',
-  serverEnabled: true,   // 서버 연동 ON
-  autoSave: true,        // 자동 저장 ON
-  autoLoad: true,        // 자동 불러오기 ON
-  autoLoadInterval: 60,  // 자동 불러오기 주기(초)
+  version: 3,
+  apiUrl: '__API_URL__',   // Vercel 빌드 때 환경변수 APP_CONFIG_API_URL 로 치환됨
+  serverEnabled: true,
+  autoSave: true,
+  autoLoad: true,
+  autoLoadInterval: 60,     // 자동 불러오기 주기(초)
 };
 ```
+
+- 서버 주소는 `config.js` 에 없습니다. **Vercel 프로젝트 → Settings → Environment Variables → `APP_CONFIG_API_URL`** 에 넣으면, 빌드(`build.js`)가 `__API_URL__` 자리에 치환합니다.
+- 환경변수가 없으면 `apiUrl` 이 빈 값이 되고 앱은 "서버 미연결"(로컬 전용)로 뜹니다 → 포크한 저장소가 원본 서버에 붙는 것을 방지.
+- `config.js` 를 직접 고칠 일(예: `autoLoadInterval` 변경)이 있으면 `version` 을 +1 하고 `index.html` 의 `config.js?v=` 도 +1.
 
 ### 현재 운영/테스트 정보
 
@@ -829,9 +812,9 @@ const APP_CONFIG = {
 |---|---|
 | 접속 주소 | `https://specialroom-eight.vercel.app` |
 | 소스 저장소 | `https://github.com/songlim26/specialroom` |
-| 운영 Apps Script URL | `https://script.google.com/macros/s/AKfycbxYOrmLo9opdrbxXmCsWshDWfhtzDBFyAT2WIFOO-RZHMsMj73fPpgyNH7tbXb8JOY/exec` |
-| 운영 구글시트 ID | `12XFU15WU8BylhAIF2FISd-mVpAQgr8Xvz1MU0iWIFHg` |
-| 테스트 Apps Script URL | `https://script.google.com/macros/s/AKfycbxBID2kGhX5Tna7VjLbdLJIJ7qAcok3-9XifjflctLZfj5EWfxVR5NF_b5LxnVl950Atg/exec` |
+| 운영 서버 주소 (Vercel 환경변수 `APP_CONFIG_API_URL` 에 등록) | `https://script.google.com/macros/s/AKfycbxYOrmLo9opdrbxXmCsWshDWfhtzDBFyAT2WIFOO-RZHMsMj73fPpgyNH7tbXb8JOY/exec` |
+| 운영 구글시트 ID (운영 `Code.gs` 의 `SHEET_ID`) | `12XFU15WU8BylhAIF2FISd-mVpAQgr8Xvz1MU0iWIFHg` |
+| 테스트 서버 주소 | `https://script.google.com/macros/s/AKfycbxBID2kGhX5Tna7VjLbdLJIJ7qAcok3-9XifjflctLZfj5EWfxVR5NF_b5LxnVl950Atg/exec` |
 | 테스트 구글시트 ID | `1IY1woiMdLKPQOUYMNzWoMbVBAFnECMfDiQiOP9iH4Rk` (운영 시트의 사본) |
 | 관리자 비밀번호 | 이 문서에 없음. Apps Script 편집기의 `ADMIN_PW` 값. 현재 담당자에게 문의 |
 

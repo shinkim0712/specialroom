@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=Hanken+Grotesk:wght@600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=39" />
+  <link rel="stylesheet" href="style.css?v=40" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
   <style>
     .flatpickr-calendar { font-size: 16px !important; width: 380px !important; max-width: 94vw !important; }
@@ -24,6 +24,10 @@
   </style>
 </head>
 <body>
+  <div id="noServerBanner" class="no-server-banner" hidden>
+    ⚠️ 서버에 연결되어 있지 않습니다 — 예약이 이 브라우저에만 저장됩니다.
+    <span>배포자: Vercel 환경변수 <code>APP_CONFIG_API_URL</code> 설정 · 임시로는 관리자 모드 → 구글시트 설정에서 주소 입력 (GUIDE 6장)</span>
+  </div>
   <div class="container">
     <!-- 상단 헤더 -->
     <header class="top-bar">
@@ -267,8 +271,8 @@
 
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ko.js"></script>
-  <script src="config.js?v=2"></script>
+  <script src="config.js?v=3"></script>
   <script src="api.js?v=22"></script>
-  <script src="app.js?v=57"></script>
+  <script src="app.js?v=58"></script>
 </body>
 </html>

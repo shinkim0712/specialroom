@@ -1,15 +1,22 @@
 // ===== 앱 설정 (구글시트 연결) =====
-// ▶ 아래 apiUrl 은 "이 사이트가 어느 서버(=어느 구글시트)에 연결되는지"를 정합니다.
-//   이 저장소를 Fork 해서 다른 학교용으로 쓸 때는, 자기 Apps Script 를 배포한 뒤
-//   아래 apiUrl 을 그 URL(.../exec)로 반드시 교체해야 합니다.
-//   안 바꾸면 새 사이트가 원래 학교의 서버·시트에 연결됩니다.
-//   교체할 때 version 숫자를 +1, index.html 의 <script src="config.js?v=N"> 의 N 도 +1.
-//   자세한 절차는 GUIDE.md 6-5 (신규 구축) / 9장 (인수인계) 참고.
+// apiUrl 은 "이 사이트가 어느 서버(=어느 구글시트)에 연결되는지"를 정합니다.
+//
+// 이 값은 저장소에 넣지 않습니다. Vercel 빌드(build.js) 때 환경변수
+//   APP_CONFIG_API_URL  의 값이 아래 apiUrl 자리표시자에 주입됩니다.
+// 환경변수가 없으면 빈 값이 되고, 앱은 "서버 미연결"(로컬 전용)로 뜹니다.
+// → 이 저장소를 Fork 한 사이트가 원본 학교 서버·시트에 붙는 것을 방지합니다.
+//
+// 설정 방법: Vercel 프로젝트 → Settings → Environment Variables 에 APP_CONFIG_API_URL 등록.
+//   임시로 붙여 쓰려면 관리자 모드 → 구글시트 설정에서 주소 입력 (그 브라우저 한정).
+// 자세한 절차: GUIDE.md 6-5·6-6 (신규 구축) / 9장 (인수인계).
+//
+// version 을 올리면 이미 접속한 브라우저에도 새 설정이 다시 적용됩니다.
+// (그때 index.html 의 <script src="config.js?v=N"> 의 N 도 함께 +1)
 const APP_CONFIG = {
-  version: 2,
-  apiUrl: 'https://script.google.com/macros/s/AKfycbxYOrmLo9opdrbxXmCsWshDWfhtzDBFyAT2WIFOO-RZHMsMj73fPpgyNH7tbXb8JOY/exec',
-  serverEnabled: true,   // 기본 서버 연동 ON
-  autoSave: true,        // 자동 저장 ON (예약 생성/삭제/수정이 바로 서버에 반영)
-  autoLoad: true,        // 자동 불러오기 ON
-  autoLoadInterval: 60,  // 자동 불러오기 주기(초) — 내 입력은 즉시 저장되지만, 남의 입력을 보는 주기라 10분은 너무 길어서 1분으로 단축
+  version: 3,
+  apiUrl: '__API_URL__',   // ← Vercel 빌드 때 APP_CONFIG_API_URL 로 치환
+  serverEnabled: true,
+  autoSave: true,
+  autoLoad: true,
+  autoLoadInterval: 60,     // 자동 불러오기 주기(초) — 남의 예약 반영 간격
 };
