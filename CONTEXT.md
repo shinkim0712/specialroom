@@ -55,7 +55,7 @@ UI/기능이 바뀌는 작업은 코드를 바로 고치지 말고, 먼저 "지�
 ## 프로젝트 개요
 학교 특별실(강당, 운동장, 농구장, 시청각실, 소통광장, 놀이마당, 도서관, 컴퓨터실 등) 예약을 관리하는 웹앱. 선생님들이 브라우저로 접속해서 주간/월별 시간표 형태로 예약. 서버 비용 없이 무료 운영. **타깃 사용자는 4~50대 비전문가 교사** — UI는 해석이 필요한 기호(색상+범례 등)보다 그냥 읽으면 이해되는 텍스트 위주로 설계할 것.
 
-**구조**: GitHub Pages + Vercel(이중 배포, 정적 호스팅) + Google Apps Script(서버 역할) + Google Sheets(DB)
+**구조**: Vercel(정적 호스팅) + Google Apps Script(서버 역할) + Google Sheets(DB)
 
 ## 파일 위치
 ```
@@ -82,9 +82,9 @@ UI/기능이 바뀌는 작업은 코드를 바로 고치지 말고, 먼저 "지�
 - **관리자 비밀번호**: 클라이언트 코드엔 없음. `apps-script/Code.gs`의 `ADMIN_PW`에만 있고, 서버가 `checkAdmin` 액션으로 검증. 실제 값은 세션 기록에 없음(운영/테스트 서로 다름, 필요시 사용자에게 문의).
 
 ## GitHub / 배포
-- **저장소**: https://github.com/songlim26/specialroom (2026-08-28 shinkim0712 → songlim26로 포크 이전)
+- **저장소**: https://github.com/shinkim0712/specialroom (현재 기준. 나중에 songlim26로 포크 예정이나 아직 안 함)
 - **배포**: Vercel `https://sr-specialroom.vercel.app` (GitHub 연동, push하면 자동 재배포). GitHub Pages는 안 씀
-- ⚠️ 이 로컬 저장소의 remote는 아직 shinkim0712일 수 있음 → 포크 후 `git remote set-url origin https://github.com/songlim26/specialroom.git` 필요
+- `apps-script/Code.gs`는 저장소에 포함됨(플레이스홀더만). 포크하면 Code.gs도 같이 딸려옴
 
 ```bash
 cd /Users/kimhyunjoonn/Documents/claude/specialroom
@@ -92,6 +92,7 @@ git add . && git commit -m "수정 내용" && git push
 ```
 
 Code.gs를 바꿨다면 git push와 별개로 **Apps Script 편집기에 직접 붙여넣기 + "배포 관리 → 편집 → 새 버전"** 재배포 필요. (SHEET_ID/ADMIN_PW 두 줄은 유지하고 나머지만 교체)
+⚠️ Code.gs 수정 시 **GUIDE.md 맨 아래 "부록. 서버 코드 전문" 블록도 함께 갱신** (인수인계서에 전문이 실려 있음).
 
 ## 기능 목록 (2026-08-27 기준)
 
@@ -224,7 +225,7 @@ Code.gs를 바꿨다면 git push와 별개로 **Apps Script 편집기에 직접 
 - ✅ (2026-08-28 수정, 배포 대기) 특별실 삭제 시 그 방의 예약·정규시간·기간규칙도 함께 삭제 (`deleteRoom`이 서버에서 4개 시트 정리, 클라이언트도 동일)
 
 ## 남은 작업 / TODO
-- [ ] songlim26로 포크 후 이 로컬 저장소 remote 변경 + Vercel 재연결
+- [ ] (나중에) songlim26로 포크 → 로컬 remote 변경 + Vercel 재연결
 - [ ] 2029년 되면 `KR_HOLIDAYS`에 새 연도 공휴일 추가
 - [ ] (선택) 학교자체 휴일 겹침 시 경고 추가할지 결정
 - [ ] (보류) 위험분석 #1 — 특별실 삭제 확인창 건수를 서버에서 재조회
