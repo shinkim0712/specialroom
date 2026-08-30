@@ -1,11 +1,10 @@
 # 특별실 예약 관리 웹앱 — 인수인계서
 
 **이 문서 하나로 시스템을 이해하고, 새로 구축하고, 유지보수하고, 다음 담당자에게 넘길 수 있습니다.**
-서버 코드 전문·설정값·운영 정보가 모두 이 문서 안(부록)에 들어 있습니다.
 
 - 최종 갱신: 2026-08-28
 - 코드 전체가 필요하면: GitHub `songlim26/specialroom` 저장소를 **Fork** 하거나 **초록색 Code 버튼 → Download ZIP**
-- 버전별 상세 변경 내역: [`CHANGELOG.md`](CHANGELOG.md) (참고용, 없어도 됨)
+- **이 문서 맨 뒤에 부록 A(서버 코드 전문)와 부록 B(설정값·운영 주소)가 있습니다.**
 
 ---
 
@@ -16,7 +15,7 @@
 | 항목 | 내용 |
 |---|---|
 | 상태 | 학교에서 실제 운영 중 |
-| 접속 주소 | Vercel (`sr-specialroom.vercel.app`) |
+| 접속 주소 | Vercel (`specialroom-eight.vercel.app`) |
 | 소스 저장소 | GitHub `songlim26/specialroom` (여기에 반영하면 Vercel이 자동 재배포) |
 | 서버 실행 계정 | 처음 배포한 사람의 개인 Google 계정 (→ 9장 인수인계) |
 
@@ -42,10 +41,10 @@
 |---|---|
 | `index.html` | 화면 뼈대와 팝업 |
 | `style.css` | 디자인 |
-| `config.js` | 구글시트 연결 주소. `apiUrl`만 바꾸면 다른 시트로 연결됨 (내용은 **부록 B**) |
+| `config.js` | 구글시트 연결 주소. `apiUrl`만 바꾸면 다른 시트로 연결됨 (내용은 문서 맨 뒤 부록 B) |
 | `api.js` | 서버 통신 함수 |
 | `app.js` | 클라이언트 전체 로직 |
-| `apps-script/Code.gs` | 서버 코드 (전문은 **부록 A**) |
+| `apps-script/Code.gs` | 서버 코드 (전문은 문서 맨 뒤 부록 A) |
 
 > **CSS·JS를 고치면 `index.html`에 있는 그 파일의 `?v=` 번호를 1 올려야** 브라우저가 새 파일을 받습니다.
 
@@ -128,7 +127,7 @@
 
 1. 그 스프레드시트 상단 메뉴 → **확장 프로그램 → Apps Script**
 2. 새 탭에 코드 편집기가 열립니다. 기본으로 있는 `function myFunction() { }` 를 **전체 선택(Ctrl/Cmd + A) → 삭제**
-3. **부록 A의 서버 코드 전체**를 복사해서 붙여넣습니다.
+3. **이 문서 맨 뒤 「부록 A. 서버 코드 전문」의 코드 전체**를 복사해서 붙여넣습니다.
 4. 붙여넣은 코드 위쪽에서 이 두 줄을 찾습니다:
    ```js
    const SHEET_ID = '여기에_구글시트_ID_입력';
@@ -159,10 +158,12 @@
 6. **확인**: 그 URL 뒤에 `?action=ping` 을 붙여 브라우저 새 탭으로 엽니다
    → `{"ok":true,"ts":"..."}` 가 보이면 서버 정상입니다.
 
-### 6-5. 코드에 서버 주소 연결 (`config.js`)
+### 6-5. 코드에 서버 주소 연결 (`config.js`) — 반드시 필요
+
+**이 단계를 건너뛰면 새로 만든 사이트가 원래 학교의 서버에 연결되어 예약이 엉뚱한 곳에 저장됩니다.** 새 사이트를 방금 만든 내 서버(6-4)로 연결하는 단계입니다.
 
 1. 6-1에서 받은 코드의 `config.js` 파일을 엽니다.
-2. 아래처럼 수정합니다 (원본 형태는 부록 B):
+2. 아래처럼 수정합니다 (원본 형태는 이 문서 맨 뒤 「부록 B」):
    ```js
    const APP_CONFIG = {
      version: 3,          // 원래 숫자에서 +1 (원래 2였으면 3)
@@ -230,7 +231,7 @@ git add -A && git commit -m "수정 내용" && git push
 
 ## 8. 테스트 (기능을 시험할 때)
 
-운영 중인 예약을 실수로 건드리지 않도록, **운영과 완전히 분리된 테스트 전용 시트·Apps Script**를 따로 둡니다 (주소는 부록 B).
+운영 중인 예약을 실수로 건드리지 않도록, **운영과 완전히 분리된 테스트 전용 시트·Apps Script**를 따로 둡니다 (주소는 문서 맨 뒤 부록 B).
 
 - 브라우저 개발자 콘솔(F12)에서 전환:
   ```js
@@ -826,7 +827,7 @@ const APP_CONFIG = {
 
 | 구분 | 값 |
 |---|---|
-| 접속 주소 | `https://sr-specialroom.vercel.app` |
+| 접속 주소 | `https://specialroom-eight.vercel.app` |
 | 소스 저장소 | `https://github.com/songlim26/specialroom` |
 | 운영 Apps Script URL | `https://script.google.com/macros/s/AKfycbxYOrmLo9opdrbxXmCsWshDWfhtzDBFyAT2WIFOO-RZHMsMj73fPpgyNH7tbXb8JOY/exec` |
 | 운영 구글시트 ID | `12XFU15WU8BylhAIF2FISd-mVpAQgr8Xvz1MU0iWIFHg` |

@@ -83,7 +83,7 @@ UI/기능이 바뀌는 작업은 코드를 바로 고치지 말고, 먼저 "지�
 
 ## GitHub / 배포
 - **저장소**: https://github.com/shinkim0712/specialroom (현재 기준. 나중에 songlim26로 포크 예정이나 아직 안 함)
-- **배포**: Vercel `https://sr-specialroom.vercel.app` (GitHub 연동, push하면 자동 재배포). GitHub Pages는 안 씀
+- **배포**: Vercel `https://specialroom-eight.vercel.app` (GitHub 연동, push하면 자동 재배포). GitHub Pages는 안 씀
 - `apps-script/Code.gs`는 저장소에 포함됨(플레이스홀더만). 포크하면 Code.gs도 같이 딸려옴
 
 ```bash
