@@ -973,6 +973,22 @@ async function flushDateRules() {
   }
 }
 
+// 탭/브라우저를 닫는 순간 아직 안 보낸 기간정규시간 변경을 마지막으로 한 번 전송.
+// sendBeacon 은 페이지가 종료돼도 브라우저가 전송을 보장한다(응답은 못 받음).
+window.addEventListener('beforeunload', () => {
+  if (!_pendingDateRuleOps.length || _dateRuleFlushing) return;   // 전송 중이면 그쪽에 맡김(중복 방지)
+  if (!(API.enabled() && localStorage.getItem('autoSave') === '1')) return;
+  const payload = _pendingDateRuleOps.map(o => o.type === 'delete'
+    ? { type: 'delete', id: o.id }
+    : { type: o.type, rule: o.rule });
+  try {
+    if (navigator.sendBeacon(API.url(), JSON.stringify({ action: 'applyDateRules', ops: payload }))) {
+      _pendingDateRuleOps = [];                 // 보냈으니 큐 비움 — 페이지가 안 죽어도 debounce가 중복 전송 안 하게
+      clearTimeout(_dateRuleFlushTimer);
+    }
+  } catch (e) { /* 종료 중이라 더 할 수 있는 게 없음 */ }
+});
+
 document.getElementById('dateRuleBtn').onclick = () => {
   const sel = document.getElementById('drRoom');
   sel.innerHTML = state.rooms.map(r => `<option value="${escapeHtml(r)}">${escapeHtml(r)}</option>`).join('');
