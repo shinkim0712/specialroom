@@ -766,7 +766,8 @@ async function loadFromServer({ force = false, includeSettings = false } = {}) {
     if (force || includeSettings) {
       if (Array.isArray(data.rooms) && data.rooms.length > 0) state.rooms = data.rooms;
       if (Array.isArray(data.schedule)) state.schedule = data.schedule;
-      if (Array.isArray(data.dateRules)) {
+      // 아직 서버로 못 보낸 기간정규시간 편집이 있으면 자동갱신으로 덮지 않음 (명시적 불러오기는 예외)
+      if (Array.isArray(data.dateRules) && (force || !_pendingDateRuleOps.length)) {
         state.dateRules = data.dateRules.map(r => ({
           ...r,
           periods: Array.isArray(r.periods) ? r.periods : JSON.parse(r.periods || '[]'),
@@ -846,6 +847,8 @@ function setupAutoLoad() {
 // ===== 모달 헬퍼 =====
 function showModal(id) { document.getElementById(id).hidden = false; }
 function closeAllModals() {
+  // 기간정규시간 모달을 닫을 때 아직 안 보낸 변경이 있으면 즉시 전송 (버튼 없이 자동 저장)
+  if (typeof _pendingDateRuleOps !== 'undefined' && _pendingDateRuleOps.length) flushDateRules();
   document.querySelectorAll('.modal-backdrop').forEach(m => m.hidden = true);
 }
 document.querySelectorAll('[data-close]').forEach(b => b.onclick = closeAllModals);
@@ -884,6 +887,91 @@ if (window.flatpickr) {
 
 // ===== 기간 정규시간 =====
 let _editingDateRuleId = null;
+// 규칙 변경(생성·수정·삭제)은 화면에 바로 반영하되, 서버 전송은 자동으로 묶는다.
+// 편집이 1.5초 멈추거나 모달을 닫으면 그때까지 쌓인 것을 한 요청으로 보냄.
+// (건마다 즉시 전송하면 편성철에 요청이 수십 개 몰려 잠금 타임아웃 → 저장 실패)
+let _pendingDateRuleOps = [];
+let _dateRuleFlushTimer = null;
+let _dateRuleFlushing = false;
+let _dateRuleFlushAgain = false;
+
+function drOpId(op) { return op.type === 'delete' ? op.id : op.rule.id; }
+
+function stageDateRuleOp(op) {
+  const id = drOpId(op);
+  const hadLocalCreate = _pendingDateRuleOps.some(o => o.type === 'create' && drOpId(o) === id);
+  _pendingDateRuleOps = _pendingDateRuleOps.filter(o => drOpId(o) !== id);
+  if (op.type === 'delete' && hadLocalCreate) {
+    // 서버에 보내기 전에 만든 규칙을 다시 삭제 → 보낼 것 없음
+  } else if (op.type === 'update' && hadLocalCreate) {
+    _pendingDateRuleOps.push({ ...op, type: 'create' });   // 아직 서버엔 없으니 create 유지
+  } else {
+    _pendingDateRuleOps.push(op);
+  }
+  scheduleDateRuleFlush();
+}
+
+function setDateRuleStatus(kind, text) {
+  const el = document.getElementById('dateRuleStatus');
+  if (!el) return;
+  el.className = 'dr-status ' + (kind || '');
+  el.textContent = text || '';
+  el.hidden = !text;
+}
+
+function scheduleDateRuleFlush(delay = 1500, keepStatus = false) {
+  clearTimeout(_dateRuleFlushTimer);
+  if (!_pendingDateRuleOps.length) return;
+  if (!keepStatus) setDateRuleStatus('saving', '저장 대기 중…');
+  _dateRuleFlushTimer = setTimeout(flushDateRules, delay);
+}
+
+async function flushDateRules() {
+  clearTimeout(_dateRuleFlushTimer);
+  if (_dateRuleFlushing) { _dateRuleFlushAgain = true; return; }
+  if (!_pendingDateRuleOps.length) { setDateRuleStatus('', ''); return; }
+  if (!(API.enabled() && localStorage.getItem('autoSave') === '1')) {
+    _pendingDateRuleOps = [];   // 서버 미연결 — 로컬에만 반영
+    setDateRuleStatus('', '');
+    return;
+  }
+  _dateRuleFlushing = true;
+  const sent = _pendingDateRuleOps.slice();   // 이번에 보낼 op들 (전송 중 새로 쌓이는 건 다음 회차)
+  const payload = sent.map(o => o.type === 'delete' ? { type: 'delete', id: o.id } : { type: o.type, rule: o.rule });
+  setDateRuleStatus('saving', '저장 중…');
+  try {
+    const res = await API.applyDateRules(payload);
+    const results = res.results || [];
+    const okIds = new Set(results.filter(r => r.ok).map(r => r.id));
+    sent.forEach(o => {
+      if (o.shadowLog && okIds.has(drOpId(o))) API.log('라벨가림', o.shadowLog).catch(e => console.warn(e));
+    });
+    const sentSet = new Set(sent);
+    _pendingDateRuleOps = _pendingDateRuleOps.filter(o => !sentSet.has(o));
+    const failed = results.filter(r => !r.ok);
+    if (failed.length) {
+      await loadFromServer({ force: true });   // 일부 실패 → 화면을 서버 기준으로
+      renderDateRuleList();
+      setDateRuleStatus('failed', `${failed.length}건 저장 실패 — 화면을 서버 기준으로 맞췄습니다`);
+      alert(`기간 정규시간 ${results.length}건 중 ${failed.length}건을 저장하지 못했습니다.\n` +
+        failed.map(f => `· ${f.error || '알 수 없는 오류'}`).join('\n') +
+        '\n\n화면은 서버의 현재 상태로 맞췄습니다. 필요하면 다시 편집해 주세요.');
+    } else if (_pendingDateRuleOps.length) {
+      scheduleDateRuleFlush(400);   // 전송 중 쌓인 게 있으면 이어서
+    } else {
+      setDateRuleStatus('saved', '저장됨');
+      setTimeout(() => { if (!_pendingDateRuleOps.length && !_dateRuleFlushing) setDateRuleStatus('', ''); }, 2500);
+    }
+  } catch (e) {
+    // 아무것도 저장 안 됨(네트워크·잠금). op는 그대로 두고 자동 재시도.
+    console.warn(e);
+    setDateRuleStatus('failed', '저장 실패 — 잠시 후 자동 재시도');
+    scheduleDateRuleFlush(6000, true);
+  } finally {
+    _dateRuleFlushing = false;
+    if (_dateRuleFlushAgain) { _dateRuleFlushAgain = false; scheduleDateRuleFlush(300); }
+  }
+}
 
 document.getElementById('dateRuleBtn').onclick = () => {
   const sel = document.getElementById('drRoom');
@@ -904,6 +992,8 @@ document.getElementById('dateRuleBtn').onclick = () => {
   document.getElementById('drBlock').checked = false;
   _editingDateRuleId = null;
   document.getElementById('saveDateRuleBtn').textContent = '추가';
+  setDateRuleStatus('', '');
+  if (_pendingDateRuleOps.length) scheduleDateRuleFlush(400);   // 직전에 못 보낸 게 있으면 이어서
   sel.onchange = renderDateRuleList;  // 특별실 바꾸면 목록도 그 특별실 것만 다시 표시
   renderDateRuleList();
   showModal('dateRuleModal');
@@ -948,6 +1038,7 @@ function renderDateRuleList() {
 }
 
 function deleteDateRule(id) {
+  if (!state.dateRules.some(r => r.id === id)) return;
   state.dateRules = state.dateRules.filter(r => r.id !== id);
   if (_editingDateRuleId === id) {
     _editingDateRuleId = null;
@@ -956,9 +1047,7 @@ function deleteDateRule(id) {
   saveState();
   render();
   renderDateRuleList();
-  if (API.enabled() && localStorage.getItem('autoSave') === '1') {
-    API.deleteDateRule(id).catch(e => console.warn(e));
-  }
+  stageDateRuleOp({ type: 'delete', id });   // 자동으로 묶여서 전송됨
 }
 
 // 요일이 학교 근무일(월~금) 밖이면 null — 주말 예약은 애초에 만들어지지 않지만 방어적으로 처리
@@ -1028,9 +1117,16 @@ document.getElementById('saveDateRuleBtn').onclick = async () => {
 
   const editingId = _editingDateRuleId;
   const rule = { id: editingId || crypto.randomUUID(), room, startDate, endDate, periods, daysOfWeek, label, blocked };
-  const prevIdx = editingId ? state.dateRules.findIndex(r => r.id === editingId) : -1;
-  const prevSnapshot = prevIdx !== -1 ? { ...state.dateRules[prevIdx] } : null;
 
+  let shadowLog = null;
+  if (shadowed.length) {
+    const pShort = k => PERIODS.find(p => p.key === k)?.label || k;
+    const names = [...new Set(shadowed.map(r => r.label))].join('", "');
+    const how = blocked ? '예약금지로 가려짐' : `"${label}"에 가려짐`;
+    shadowLog = `${room} [${daysOfWeek.join(',')}] ${periods.map(pShort).join('·')} · "${names}"이(가) ${how}`;
+  }
+
+  const prevIdx = editingId ? state.dateRules.findIndex(r => r.id === editingId) : -1;
   if (editingId) {
     if (prevIdx !== -1) state.dateRules[prevIdx] = rule;
   } else {
@@ -1042,31 +1138,8 @@ document.getElementById('saveDateRuleBtn').onclick = async () => {
   render();
   renderDateRuleList();
 
-  // 예약처럼 실시간 낱개 저장. 실패하면 로컬을 되돌림.
-  if (API.enabled() && localStorage.getItem('autoSave') === '1') {
-    try {
-      const res = editingId ? await API.updateDateRule(rule) : await API.createDateRule(rule);
-      if (!res || !res.ok) throw new Error((res && res.error) || 'save failed');
-      if (shadowed.length) {
-        const pShort = k => PERIODS.find(p => p.key === k)?.label || k;
-        const names = [...new Set(shadowed.map(r => r.label))].join('", "');
-        const how = blocked ? '예약금지로 가려짐' : `"${label}"에 가려짐`;
-        API.log('라벨가림', `${room} [${daysOfWeek.join(',')}] ${periods.map(pShort).join('·')} · "${names}"이(가) ${how}`).catch(err => console.warn(err));
-      }
-    } catch (e) {
-      console.warn(e);
-      if (editingId && prevSnapshot) {
-        const i = state.dateRules.findIndex(r => r.id === editingId);
-        if (i !== -1) state.dateRules[i] = prevSnapshot;
-      } else {
-        state.dateRules = state.dateRules.filter(r => r.id !== rule.id);
-      }
-      saveState();
-      render();
-      renderDateRuleList();
-      alert('기간 정규시간을 서버에 저장하지 못했습니다. 네트워크를 확인하고 다시 시도해 주세요.');
-    }
-  }
+  // 화면엔 이미 반영됨. 서버 전송은 stageDateRuleOp이 자동으로 묶어서(1.5초 후 or 모달 닫을 때) 보냄
+  stageDateRuleOp(editingId ? { type: 'update', rule, shadowLog } : { type: 'create', rule, shadowLog });
 };
 
 // ===== 학교자체 휴일 관리 (관리자) =====
@@ -1107,7 +1180,9 @@ function renderHolidayList() {
     </div>`).join('');
 }
 
-function deleteHoliday(id) {
+async function deleteHoliday(id) {
+  const prev = state.customHolidays.find(h => h.id === id);
+  if (!prev) return;
   state.customHolidays = state.customHolidays.filter(h => h.id !== id);
   if (_editingHolidayId === id) {
     _editingHolidayId = null;
@@ -1117,7 +1192,17 @@ function deleteHoliday(id) {
   render();
   renderHolidayList();
   if (API.enabled() && localStorage.getItem('autoSave') === '1') {
-    API.deleteHoliday(id).catch(e => console.warn(e));
+    try {
+      const res = await API.deleteHoliday(id);
+      if (!res || !res.ok) throw new Error((res && res.error) || 'delete failed');
+    } catch (e) {
+      console.warn(e);
+      state.customHolidays.push(prev);   // 서버 반영 실패 → 화면 되돌림
+      saveState();
+      render();
+      renderHolidayList();
+      alert('학교휴일 삭제를 서버에 반영하지 못했습니다. 잠시 후 다시 시도해 주세요.');
+    }
   }
 }
 

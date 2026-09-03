@@ -243,6 +243,15 @@ h2 { margin: 4px 0 12px; font-size: 18px; font-family: "Hanken Grotesk", "Noto S
   margin-bottom: 8px; font-size: 13px;
 }
 
+/* 기간정규시간 — 자동 저장 상태 표시 (누르는 것 아님) */
+.dr-status {
+  margin: 10px 0; padding: 8px 12px; border-radius: 8px;
+  font-size: 13px; font-weight: 600;
+}
+.dr-status.saving { background: #eff6ff; color: #1e40af; }
+.dr-status.saved  { background: #ecfdf5; color: #047857; }
+.dr-status.failed { background: #fef2f2; color: #b91c1c; }
+
 /* 다중 선택 */
 .schedule td.selected {
   background: #dbeafe !important;

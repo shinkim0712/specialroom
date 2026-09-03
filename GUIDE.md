@@ -352,6 +352,7 @@ function doPost(e) {
     if (action === 'createDateRule') return json(createDateRule(body));
     if (action === 'updateDateRule') return json(updateDateRule(body));
     if (action === 'deleteDateRule') return json(deleteDateRule(body));
+    if (action === 'applyDateRules') return json(applyDateRules(body));
     if (action === 'addRoom')      return json(addRoom(body));
     if (action === 'deleteRoom')   return json(deleteRoom(body));
     if (action === 'reorderRooms') return json(reorderRooms(body));
@@ -373,7 +374,7 @@ function checkAdmin(body) {
 // 동시에 같은 칸을 예약하는 경우를 막기 위해 중복확인+저장을 잠금으로 묶음
 function createReservation(body) {
   const lock = LockService.getScriptLock();
-  lock.waitLock(10000);
+  lock.waitLock(45000);
   try {
     const all = readSheet('reservations');
     if (all.some(r => r.room === body.room && r.date === body.date && String(r.period) === String(body.period))) {
@@ -453,7 +454,7 @@ function dateRuleRow(r) {
 
 function createDateRule(body) {
   const lock = LockService.getScriptLock();
-  lock.waitLock(10000);
+  lock.waitLock(45000);
   try {
     const sheet = sheetOf('dateRules');
     const row = dateRuleRow(body);
@@ -470,7 +471,7 @@ function createDateRule(body) {
 
 function updateDateRule(body) {
   const lock = LockService.getScriptLock();
-  lock.waitLock(10000);
+  lock.waitLock(45000);
   try {
     const sheet = sheetOf('dateRules');
     const data = sheet.getDataRange().getValues();
@@ -499,7 +500,7 @@ function updateDateRule(body) {
 
 function deleteDateRule(body) {
   const lock = LockService.getScriptLock();
-  lock.waitLock(10000);
+  lock.waitLock(45000);
   try {
     const sheet = sheetOf('dateRules');
     const data = sheet.getDataRange().getValues();
@@ -519,10 +520,91 @@ function deleteDateRule(body) {
   }
 }
 
+// 여러 기간정규시간 변경(생성·수정·삭제)을 잠금 1회로 한꺼번에 처리.
+// 관리자 편성철에 규칙 수십 건을 만들 때, 건마다 요청/잠금 대기하다 타임아웃 나는 것을 없앰.
+// body.ops = [{type:'create', rule}, {type:'update', rule}, {type:'delete', id}]
+// "전체 목록 덮어쓰기"가 아니라 명시적 op만 받으므로 saveAll 류의 데이터 소실 위험 없음.
+function applyDateRules(body) {
+  const ops = Array.isArray(body.ops) ? body.ops : [];
+  if (!ops.length) return { ok: true, results: [] };
+  const lock = LockService.getScriptLock();
+  lock.waitLock(45000);
+  try {
+    const sheet = sheetOf('dateRules');
+    const results = [];
+    const pendingLogs = [];
+
+    // 1) 생성 — 전부 모아서 한 번에 씀 (건마다 setValues 하면 행당 몇 초씩 걸려 잠금을 오래 잡음)
+    const creates = ops.filter(o => o.type === 'create');
+    if (creates.length) {
+      try {
+        const rows = creates.map(o => dateRuleRow(o.rule));
+        const rg = sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, rows[0].length);
+        rg.setNumberFormat('@');
+        rg.setValues(rows);
+        creates.forEach((o, k) => results.push({ id: rows[k][0], ok: true }));
+      } catch (e) {
+        creates.forEach(o => results.push({ id: o.rule && o.rule.id, ok: false, error: String(e) }));
+      }
+    }
+
+    // 2) 수정·삭제 — 시트를 한 번만 읽고 처리 (삭제는 행 번호 큰 것부터 → 인덱스 안 밀림)
+    const updates = ops.filter(o => o.type === 'update');
+    const deletes = ops.filter(o => o.type === 'delete');
+    if (updates.length || deletes.length) {
+      const data = sheet.getDataRange().getValues();
+      const headers = data[0];
+      const idCol = headers.indexOf('id');
+      const rowOf = {};
+      for (let i = 1; i < data.length; i++) rowOf[data[i][idCol]] = i;
+
+      for (const op of updates) {
+        const i = rowOf[op.rule.id];
+        if (i === undefined) { results.push({ id: op.rule.id, ok: false, error: 'not found' }); continue; }
+        try {
+          const before = rowObj(headers, data[i]);
+          const row = dateRuleRow(op.rule);
+          const rg = sheet.getRange(i + 1, 1, 1, row.length);
+          rg.setNumberFormat('@');
+          rg.setValues([row]);
+          const changes = [];
+          if (plainStr(before.label) !== String(op.rule.label || '')) changes.push(`라벨 "${plainStr(before.label)}"→"${op.rule.label || ''}"`);
+          const wasBlocked = (before.blocked === true || before.blocked === 'true');
+          if (wasBlocked !== !!op.rule.blocked) changes.push(op.rule.blocked ? '예약금지 설정' : '예약금지 해제');
+          if (changes.length) pendingLogs.push(['기간규칙수정', `${op.rule.room} · ${changes.join(', ')}`]);
+          results.push({ id: op.rule.id, ok: true });
+        } catch (e) {
+          results.push({ id: op.rule.id, ok: false, error: String(e) });
+        }
+      }
+
+      deletes
+        .map(op => ({ op, i: rowOf[op.id] }))
+        .sort((a, b) => (b.i === undefined ? -1 : b.i) - (a.i === undefined ? -1 : a.i))
+        .forEach(({ op, i }) => {
+          if (i === undefined) { results.push({ id: op.id, ok: false, error: 'not found' }); return; }
+          try {
+            const r = rowObj(headers, data[i]);
+            sheet.deleteRow(i + 1);
+            pendingLogs.push(['기간규칙삭제', dateRuleSummary(r)]);
+            results.push({ id: op.id, ok: true });
+          } catch (e) {
+            results.push({ id: op.id, ok: false, error: String(e) });
+          }
+        });
+    }
+
+    pendingLogs.forEach(l => appendLog(l[0], l[1]));
+    return { ok: results.every(r => r.ok), results: results };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 // ===== 특별실(rooms) 낱개 저장 — 서버의 현재 목록을 읽어 반영(동시 편집 시 유실 방지) =====
 function addRoom(body) {
   const lock = LockService.getScriptLock();
-  lock.waitLock(10000);
+  lock.waitLock(45000);
   try {
     const name = String(body.name || '').trim();
     if (!name) return { ok: false, error: 'empty' };
@@ -537,7 +619,7 @@ function addRoom(body) {
 
 function deleteRoom(body) {
   const lock = LockService.getScriptLock();
-  lock.waitLock(10000);
+  lock.waitLock(45000);
   try {
     const name = String(body.name || '').trim();
 
@@ -577,7 +659,7 @@ function deleteRowsWhere(sheetName, matchFn) {
 
 function reorderRooms(body) {
   const lock = LockService.getScriptLock();
-  lock.waitLock(10000);
+  lock.waitLock(45000);
   try {
     const current = readSheet('rooms').map(r => String(r.name));
     const desired = (body.order || []).map(String).filter(n => current.indexOf(n) !== -1);
@@ -593,7 +675,7 @@ function reorderRooms(body) {
 // ===== 학교휴일(holidays) 낱개 저장 =====
 function createHoliday(body) {
   const lock = LockService.getScriptLock();
-  lock.waitLock(10000);
+  lock.waitLock(45000);
   try {
     const sheet = sheetOf('holidays');
     const row = [body.id || Utilities.getUuid(), body.startDate, body.endDate, body.label || ''];
@@ -609,7 +691,7 @@ function createHoliday(body) {
 
 function updateHoliday(body) {
   const lock = LockService.getScriptLock();
-  lock.waitLock(10000);
+  lock.waitLock(45000);
   try {
     const sheet = sheetOf('holidays');
     const data = sheet.getDataRange().getValues();
@@ -638,7 +720,7 @@ function updateHoliday(body) {
 
 function deleteHoliday(body) {
   const lock = LockService.getScriptLock();
-  lock.waitLock(10000);
+  lock.waitLock(45000);
   try {
     const sheet = sheetOf('holidays');
     const data = sheet.getDataRange().getValues();
@@ -672,8 +754,15 @@ function cleanup(body) {
 }
 
 // ===== 시트 헬퍼 =====
+// openById 는 실행(요청)마다 1회만 — 잠금을 잡은 채 스프레드시트를 여러 번 여는 비용을 없앰.
+// Apps Script 는 요청마다 전역을 새로 초기화하므로 _ss 는 자동으로 리셋됨.
+let _ss = null;
+function spreadsheet_() {
+  if (!_ss) _ss = SpreadsheetApp.openById(SHEET_ID);
+  return _ss;
+}
 function sheetOf(name) {
-  const ss = SpreadsheetApp.openById(SHEET_ID);
+  const ss = spreadsheet_();
   let s = ss.getSheetByName(name);
   if (!s) {
     s = ss.insertSheet(name);
