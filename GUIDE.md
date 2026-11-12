@@ -61,7 +61,7 @@
 | `rooms` | 특별실 목록 | `name · order` |
 | `dateRules` | 기간 정규시간 / 예약 금지 | `room · startDate · endDate · periods · daysOfWeek · label · blocked` |
 | `holidays` | 학교자체 휴일 (방학 등) | `startDate · endDate · label` |
-| `logs` | 변경 기록 (삭제·수정·가림·특별실 추가/순서변경/삭제) | `ts · action · summary` |
+| `logs` | 변경 기록 (삭제·수정·가림·특별실 추가/순서변경/이름변경/삭제·서버 정리) | `ts · action · summary` |
 
 - `period`: `1`~`8`, `4A`(4교시 저학년), `4E`(4교시 고학년), `5EH`(5교시)
 - `blocked`가 `true`면 그 칸은 예약이 막힘
@@ -93,9 +93,10 @@
 
 ### 관리자 (위 기능에 더해)
 - 특별실 삭제(탭 우클릭, 딸린 예약·규칙도 함께 삭제) / 순서 변경(탭 길게 눌러 이동)
+- **특별실 이름 변경**(상단 `특별실 이름 변경` 버튼): 그 특별실의 예약·기간 규칙의 방 이름도 함께 바뀜. 이미 있는 이름이면 막힘. 시트에서 `rooms` 탭의 이름만 고치면 데이터가 둘로 갈리니 **반드시 이 버튼으로** 바꿉니다
 - 학교휴일 관리
 - 변경 기록 조회
-- 구글시트 설정 / 서버에서 불러오기
+- 구글시트 설정 / 서버에서 불러오기 / 서버 데이터 정리(id가 없거나 중복된 예약 줄만 삭제)
 
 ### 예약 금지
 - 막으려는 칸에 이미 예약이 있으면, 지우지 않고 목록만 보여준 뒤 멈춤 → 예약자에게 연락해 지운 뒤 다시 시도
@@ -375,6 +376,7 @@ function doPost(e) {
     if (action === 'addRoom')      return json(addRoom(body));
     if (action === 'deleteRoom')   return json(deleteRoom(body));
     if (action === 'reorderRooms') return json(reorderRooms(body));
+    if (action === 'renameRoom')   return json(renameRoom(body));
     if (action === 'createHoliday') return json(createHoliday(body));
     if (action === 'updateHoliday') return json(updateHoliday(body));
     if (action === 'deleteHoliday') return json(deleteHoliday(body));
@@ -733,6 +735,78 @@ function reorderRooms(body) {
   }
 }
 
+// ===== 특별실 이름 변경 =====
+// 특별실 이름은 예약·기간규칙 줄마다 글자 그대로 들어 있어서, rooms 탭만 고치면 데이터가 둘로 갈린다.
+// 그래서 rooms 의 그 행 + 예약·기간규칙의 방 이름 열만 바꾼다. 비우고 다시 쓰지 않고(방 이름 열만 한 번에 덮어씀),
+// 순서·다른 열·다른 줄은 그대로. rooms 행은 맨 마지막에 바꾸므로, 중간에 끊겨도 같은 요청을 다시 보내면 이어서 끝난다.
+// (쓰이지 않는 schedule 탭은 건드리지 않는다)
+
+// 시트의 'room' 열을 읽어 둠 → { sheet, data, col }
+function roomColumn_(sheetName) {
+  const sheet = sheetOf(sheetName);
+  const data = sheet.getDataRange().getValues();
+  const col = data.length ? data[0].indexOf('room') : -1;
+  if (col === -1) throw new Error(sheetName + ' 탭에 room 열이 없어 이름 변경을 중단했습니다');
+  return { sheet, data, col };
+}
+
+// 'room' 열에서 oldName → newName. 방 이름 열만 한 번에 덮어씀. 바뀐 줄 수를 돌려줌
+function renameInRoomColumn_(R, oldName, newName) {
+  let n = 0;
+  const vals = R.data.slice(1).map(row => {
+    if (String(row[R.col]).trim() === oldName) { n++; return [newName]; }
+    return [row[R.col]];
+  });
+  if (n) {
+    const rg = R.sheet.getRange(2, R.col + 1, vals.length, 1);
+    rg.setNumberFormat('@');   // 이름이 날짜처럼 보여도 시트가 재해석하지 않게
+    rg.setValues(vals);
+  }
+  return n;
+}
+
+function renameRoom(body) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(45000);
+  try {
+    const oldName = String(body.oldName || '').trim();
+    const newName = String(body.newName || '').trim();
+    if (!oldName || !newName) return { ok: false, error: 'empty' };
+    if (oldName === newName) return { ok: false, error: 'same' };
+
+    const rows = roomRows_();
+    const target = rows.find(r => r.name === oldName);
+    if (!target) return { ok: false, error: 'not in list' };      // 시트 목록에 없는 임시 탭
+    if (rows.some(r => r.name === newName)) return { ok: false, error: 'exists' };
+
+    const RES = roomColumn_('reservations');
+    const RUL = roomColumn_('dateRules');
+
+    // 새 이름에 옛 예약만 남아 있는 경우(이전 시도가 중간에 끊긴 뒤 재시도)에만 의미 있는 검사:
+    // 같은 날·같은 교시가 겹치면 이중 예약이 되므로 아무것도 바꾸지 않고 거부한다.
+    const hdr = RES.data[0], dI = hdr.indexOf('date'), pI = hdr.indexOf('period');
+    const keyOf = row => plainStr(row[dI]) + ' ' + String(row[pI]) + '교시';
+    const taken = {};
+    RES.data.slice(1).forEach(row => { if (String(row[RES.col]).trim() === newName) taken[keyOf(row)] = true; });
+    const conflicts = RES.data.slice(1)
+      .filter(row => String(row[RES.col]).trim() === oldName && taken[keyOf(row)]).map(keyOf);
+    if (conflicts.length) return { ok: false, error: 'conflict', conflicts: conflicts.slice(0, 5) };
+
+    const resN = renameInRoomColumn_(RES, oldName, newName);
+    const ruleN = renameInRoomColumn_(RUL, oldName, newName);
+
+    // rooms 행은 맨 마지막 — 이름 칸 하나만 제자리에서 바꿈 (order 는 그대로)
+    const cell = sheetOf('rooms').getRange(target.row, 1);
+    cell.setNumberFormat('@');
+    cell.setValue(newName);
+
+    appendLog('특별실이름변경', `"${oldName}" → "${newName}" — 예약 ${resN} / 기간규칙 ${ruleN}`);
+    return { ok: true, reservations: resN, dateRules: ruleN };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 // ===== 학교휴일(holidays) 낱개 저장 =====
 function createHoliday(body) {
   const lock = LockService.getScriptLock();
@@ -801,17 +875,37 @@ function deleteHoliday(body) {
   }
 }
 
+// 서버 데이터 정리: id 가 없거나 중복된 예약 줄만 지운다 (중복이면 먼저 나온 줄을 남김).
+// ⚠️ 예약 시트를 clear() 로 비운 뒤 다시 쓰지 않는다 — 쓰는 도중 실패하거나 그 사이 들어온 예약이 있으면
+//    예약이 통째로 사라질 수 있었음. 문제 있는 줄만 골라 그 줄만 지우고, 다른 쓰기와 같은 잠금 안에서 실행한다.
 function cleanup(body) {
   if (body.adminPw !== ADMIN_PW) return { ok: false, error: 'unauthorized' };
-  // 빈 행, 중복 id 제거
-  const res = readSheet('reservations');
-  const seen = new Set();
-  const cleaned = res.filter(r => {
-    if (!r.id || seen.has(r.id)) return false;
-    seen.add(r.id); return true;
-  });
-  writeSheet('reservations', cleaned);
-  return { ok: true, removed: res.length - cleaned.length };
+  const lock = LockService.getScriptLock();
+  lock.waitLock(45000);
+  try {
+    const sheet = sheetOf('reservations');
+    const data = sheet.getDataRange().getValues();
+    const headers = data[0] || [];
+    const idCol = headers.indexOf('id');
+    if (idCol === -1) return { ok: false, error: 'no id column' };
+
+    const seen = {};
+    const bad = [];   // { row: 시트 행 번호, summary }
+    for (let i = 1; i < data.length; i++) {
+      if (!data[i].some(v => v !== '')) continue;   // 완전히 빈 줄은 readSheet 도 무시하므로 그대로 둠
+      const id = String(data[i][idCol]).trim();
+      if (!id || seen[id]) bad.push({ row: i + 1, summary: reservationSummary(rowObj(headers, data[i])) });
+      else seen[id] = true;
+    }
+
+    bad.slice().reverse().forEach(b => sheet.deleteRow(b.row));   // 아래에서 위로 — 행 번호가 밀리지 않게
+    if (bad.length) {
+      appendLog('서버정리', `id 없음·중복 예약 ${bad.length}건 삭제: ` + bad.slice(0, 5).map(b => b.summary).join(' / '));
+    }
+    return { ok: true, removed: bad.length };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // ===== 시트 헬퍼 =====
@@ -861,18 +955,6 @@ function normalizeCell(header, value) {
     return value === true || value === 'true' || value === 'TRUE';
   }
   return value;
-}
-
-function writeSheet(name, rows) {
-  const sheet = sheetOf(name);
-  const headers = HEADERS[name];
-  sheet.clear();
-  sheet.appendRow(headers);
-  if (!rows.length) return;
-  const matrix = rows.map(r => headers.map(h => r[h] !== undefined ? r[h] : ''));
-  const range = sheet.getRange(2, 1, matrix.length, headers.length);
-  range.setNumberFormat('@');  // 전부 일반 텍스트로 고정 — 날짜처럼 보이는 라벨을 시트가 Date로 재해석하는 것 방지
-  range.setValues(matrix);
 }
 
 // 화면에 보여줄 특별실 목록 = rooms 탭(order 순) + 탭에는 없지만 "오늘 이후 예약" 또는 "아직 끝나지 않은

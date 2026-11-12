@@ -625,6 +625,7 @@ const ADMIN_HELP_TEXT = `관리자 모드 활성화
 - + 특별실 추가: 사용자도 가능 (추가 즉시 서버 반영)
 - 탭 우클릭 → 삭제 (관리자만). 그 특별실의 예약·정규시간·기간 규칙도 함께 삭제됨
 - 탭 꾹 눌러 드래그 → 순서 변경 (관리자만, 즉시 서버 반영)
+- 특별실 이름 변경 버튼 → 특별실 이름 바꾸기 (관리자만). 그 특별실의 예약·기간 규칙의 방 이름도 함께 바뀜
 
 [학교휴일 관리]
 - 학교휴일 관리 버튼 → 방학·재량휴업일·개교기념일 등 학교자체 휴일 등록/삭제 (즉시 서버 반영)
@@ -1264,6 +1265,84 @@ document.getElementById('saveHolidayBtn').onclick = async () => {
       renderHolidayList();
       alert('학교휴일을 서버에 저장하지 못했습니다. 네트워크를 확인하고 다시 시도해 주세요.');
     }
+  }
+};
+
+// ===== 특별실 이름 변경 (관리자) =====
+function roomUseCounts(room) {
+  return {
+    resN: state.reservations.filter(x => x.room === room).length,
+    ruleN: state.dateRules.filter(x => x.room === room).length,
+  };
+}
+
+function renderRenameInfo() {
+  const { resN, ruleN } = roomUseCounts(document.getElementById('rnRoom').value);
+  document.getElementById('rnInfo').textContent =
+    `이 특별실의 예약 ${resN}건·기간 규칙 ${ruleN}건의 방 이름도 함께 새 이름으로 바뀝니다. (예약 날짜·내용은 그대로)`;
+}
+
+document.getElementById('renameRoomBtn').onclick = () => {
+  const sel = document.getElementById('rnRoom');
+  sel.innerHTML = state.rooms.map(r => `<option value="${escapeHtml(r)}">${escapeHtml(r)}</option>`).join('');
+  if (state.currentRoom && state.rooms.includes(state.currentRoom)) sel.value = state.currentRoom;
+  sel.onchange = renderRenameInfo;
+  document.getElementById('rnNewName').value = '';
+  renderRenameInfo();
+  showModal('renameRoomModal');
+};
+
+// 서버가 같은 변경을 마쳤을 때(또는 서버 미연결일 때) 이 브라우저의 화면 데이터에 똑같이 반영
+function applyRoomRenameLocal(oldName, newName) {
+  state.rooms = state.rooms.map(r => r === oldName ? newName : r);
+  state.reservations.forEach(r => { if (r.room === oldName) r.room = newName; });
+  state.dateRules.forEach(r => { if (r.room === oldName) r.room = newName; });
+  if (state.currentRoom === oldName) state.currentRoom = newName;
+  saveState();
+  render();
+}
+
+document.getElementById('rnSaveBtn').onclick = async () => {
+  const oldName = document.getElementById('rnRoom').value;
+  const newName = document.getElementById('rnNewName').value.trim();
+  if (!oldName) return;
+  if (!newName) { alert('새 이름을 입력하세요.'); return; }
+  if (newName === oldName) { alert('현재 이름과 같습니다.'); return; }
+  if (state.rooms.includes(newName)) { alert('이미 있는 특별실 이름입니다.'); return; }
+
+  const { resN, ruleN } = roomUseCounts(oldName);
+  const extra = (resN || ruleN) ? `\n\n예약 ${resN}건·기간 규칙 ${ruleN}건도 함께 새 이름으로 바뀝니다.` : '';
+  if (!confirm(`'${oldName}' 특별실을 '${newName}'(으)로 바꾸시겠습니까?${extra}`)) return;
+
+  if (!(API.enabled() && localStorage.getItem('autoSave') === '1')) {
+    applyRoomRenameLocal(oldName, newName);   // 서버 미연결 — 이 브라우저에서만 바뀜
+    closeAllModals();
+    return;
+  }
+
+  const btn = document.getElementById('rnSaveBtn');
+  btn.disabled = true;
+  btn.textContent = '변경 중…';
+  try {
+    const res = await API.renameRoom(oldName, newName);
+    if (res && res.ok) {
+      applyRoomRenameLocal(oldName, newName);
+      closeAllModals();
+    } else if (res && res.error === 'exists') {
+      alert('이미 있는 특별실 이름입니다.');
+    } else if (res && res.error === 'conflict') {
+      alert(`새 이름에 같은 날·같은 교시 예약이 이미 있어 바꿀 수 없습니다:\n${(res.conflicts || []).join('\n')}`);
+    } else if (res && res.error === 'not in list') {
+      alert('시트의 특별실 목록에 없는 임시 탭이라 이름을 바꿀 수 없습니다.\n이 방의 예약을 정리하면 탭이 사라집니다.');
+    } else {
+      throw new Error((res && res.error) || 'rename failed');
+    }
+  } catch (e) {
+    console.warn(e);
+    alert('이름 변경을 서버에 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.\n(이미 일부 바뀌었을 수 있으니, 같은 이름 변경을 한 번 더 시도하면 이어서 끝납니다.)');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '이름 변경';
   }
 };
 

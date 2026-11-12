@@ -54,6 +54,7 @@ const API = {
   addRoom(name)            { return this._post('addRoom', { name }); },
   deleteRoom(name)         { return this._post('deleteRoom', { name }); },
   reorderRooms(order)      { return this._post('reorderRooms', { order }); },
+  renameRoom(oldName, newName) { return this._post('renameRoom', { oldName, newName }); },
   createHoliday(h)         { return this._post('createHoliday', h); },
   updateHoliday(h)         { return this._post('updateHoliday', h); },
   deleteHoliday(id)        { return this._post('deleteHoliday', { id }); },
