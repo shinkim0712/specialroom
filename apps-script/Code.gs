@@ -21,7 +21,7 @@ const HEADERS = {
   schedule: ['room', 'dayOfWeek', 'period', 'label'],
   dateRules: ['id', 'room', 'startDate', 'endDate', 'periods', 'daysOfWeek', 'label', 'blocked'],
   holidays: ['id', 'startDate', 'endDate', 'label'],
-  logs: ['ts', 'action', 'summary'],   // 없어진 것 기록 (삭제·수정·가림). 누가 했는지는 안 남김
+  logs: ['ts', 'action', 'summary'],   // 변경 기록 (삭제·수정·가림·특별실 추가/순서/삭제). 누가 했는지는 안 남김
 };
 
 const FIELD_KO = { room: '특별실', date: '날짜', period: '교시', name: '이름', classroom: '학급', purpose: '목적' };
@@ -35,13 +35,17 @@ function doGet(e) {
     if (action === 'schedule') return json(readSheet('schedule'));
     if (action === 'rooms')    return json(readSheet('rooms'));
     if (action === 'logs')     return json(readLogs());
-    if (action === 'loadAll')  return json({
-      rooms: readSheet('rooms').sort((a,b)=>(a.order||0)-(b.order||0)).map(r => r.name),
-      reservations: readSheet('reservations'),
-      schedule: readSheet('schedule'),
-      dateRules: readSheet('dateRules'),
-      holidays: readSheet('holidays'),
-    });
+    if (action === 'loadAll') {
+      const reservations = readSheet('reservations');
+      const dateRules = readSheet('dateRules');
+      return json({
+        rooms: roomsForClient_(readSheet('rooms'), reservations, dateRules),
+        reservations,
+        schedule: readSheet('schedule'),
+        dateRules,
+        holidays: readSheet('holidays'),
+      });
+    }
     return json({ error: 'unknown action: ' + action });
   } catch (err) {
     return json({ error: String(err) });
@@ -311,6 +315,9 @@ function applyDateRules(body) {
 }
 
 // ===== 특별실(rooms) 낱개 저장 — 서버의 현재 목록을 읽어 반영(동시 편집 시 유실 방지) =====
+// ⚠️ rooms 탭은 clear()로 비운 뒤 다시 쓰지 않는다. 쓰는 도중 실패하면 목록이 통째로 사라지는
+//    사고(2026-11-12)가 있었음. 항상 "기존 행을 제자리에서 덮어쓰기 / 해당 행만 삭제"로만 바꾼다.
+//    (시트에서 rooms 탭을 사람이 직접 수정하는 것도 피할 것)
 function addRoom(body) {
   const lock = LockService.getScriptLock();
   lock.waitLock(45000);
@@ -320,9 +327,41 @@ function addRoom(body) {
     const rooms = readSheet('rooms');
     if (rooms.some(r => String(r.name).trim() === name)) return { ok: false, error: 'exists' };
     sheetOf('rooms').appendRow([name, rooms.length]);
+    appendLog('특별실추가', `"${name}"`);
     return { ok: true };
   } finally {
     lock.releaseLock();
+  }
+}
+
+// rooms 탭에서 비어있지 않은 방 행 → [{ row: 시트 행 번호, name }]
+function roomRows_() {
+  const data = sheetOf('rooms').getDataRange().getValues();
+  const out = [];
+  for (let i = 1; i < data.length; i++) {
+    if (data[i].some(v => v !== '')) out.push({ row: i + 1, name: String(data[i][0]).trim() });
+  }
+  return out;
+}
+
+// 현재 방 행 수와 같은 개수의 이름 목록을 order 0..n-1 로 제자리에 덮어씀 (행 수가 다르면 아무것도 안 쓰고 중단)
+function writeRoomsInPlace_(names) {
+  const rows = roomRows_();
+  if (rows.length !== names.length) throw new Error('rooms 행 수가 달라 쓰기를 중단했습니다');
+  if (!rows.length) return;
+  const sheet = sheetOf('rooms');
+  const matrix = names.map((n, i) => [n, i]);
+  const contiguous = rows.every((r, i) => r.row === rows[0].row + i);
+  if (contiguous) {
+    const rg = sheet.getRange(rows[0].row, 1, rows.length, 2);
+    rg.setNumberFormat('@');   // 방 이름이 날짜처럼 보여도 시트가 재해석하지 않게
+    rg.setValues(matrix);
+  } else {
+    rows.forEach((r, i) => {
+      const rg = sheet.getRange(r.row, 1, 1, 2);
+      rg.setNumberFormat('@');
+      rg.setValues([matrix[i]]);
+    });
   }
 }
 
@@ -331,16 +370,21 @@ function deleteRoom(body) {
   lock.waitLock(45000);
   try {
     const name = String(body.name || '').trim();
+    if (!name) return { ok: false, error: 'empty' };
 
-    // rooms 시트는 작고 order 재정렬이 필요해 통째 다시 쓰기 유지
-    const kept = readSheet('rooms').filter(r => String(r.name).trim() !== name);
-    writeSheet('rooms', kept.map((r, i) => ({ name: r.name, order: i })));
+    // 시작을 먼저 기록 — 중간에 실패해도 "삭제를 시도했다"는 흔적이 남음
+    appendLog('특별실삭제(시작)', `"${name}"`);
 
-    // 딸린 데이터는 "해당 행만" 삭제 — clear() 후 setValues() 사이에 실패하면
-    // 시트 전체가 날아가는 위험이 있어서 통째 다시 쓰기(writeSheet)를 쓰지 않음
+    // 딸린 데이터를 "해당 행만" 먼저 삭제 (통째 다시 쓰기 금지).
+    // 목록에서 방을 빼는 건 맨 마지막 — 중간에 실패해도 방이 목록에 남아 있어 다시 삭제하면 이어서 끝난다.
     const resGone  = deleteRowsWhere('reservations', r => String(r.room).trim() === name);
     const schGone  = deleteRowsWhere('schedule',     r => String(r.room).trim() === name);
     const ruleGone = deleteRowsWhere('dateRules',    r => String(r.room).trim() === name);
+
+    // 목록에서는 그 방의 행만 지우고, order 만 0부터 다시 매김 (clear 안 씀)
+    roomRows_().filter(r => r.name === name).map(r => r.row).sort((a, b) => b - a)
+      .forEach(row => sheetOf('rooms').deleteRow(row));
+    writeRoomsInPlace_(roomRows_().map(r => r.name));
 
     appendLog('특별실삭제', `"${name}" — 함께 삭제: 예약 ${resGone} / 정규시간 ${schGone} / 기간규칙 ${ruleGone}`);
     return { ok: true };
@@ -370,11 +414,13 @@ function reorderRooms(body) {
   const lock = LockService.getScriptLock();
   lock.waitLock(45000);
   try {
-    const current = readSheet('rooms').map(r => String(r.name));
-    const desired = (body.order || []).map(String).filter(n => current.indexOf(n) !== -1);
+    const current = roomRows_().map(r => r.name);
+    const seen = {};
+    const desired = (body.order || []).map(String).filter(n => current.indexOf(n) !== -1 && !seen[n] && (seen[n] = true));
     const missing = current.filter(n => desired.indexOf(n) === -1);  // 그 사이 다른 사용자가 추가한 방
     const finalOrder = desired.concat(missing);
-    writeSheet('rooms', finalOrder.map((name, i) => ({ name, order: i })));
+    writeRoomsInPlace_(finalOrder);   // 제자리 덮어쓰기 — 비우고 다시 쓰지 않음
+    appendLog('특별실순서변경', finalOrder.join(' > '));
     return { ok: true };
   } finally {
     lock.releaseLock();
@@ -523,12 +569,30 @@ function writeSheet(name, rows) {
   range.setValues(matrix);
 }
 
+// 화면에 보여줄 특별실 목록 = rooms 탭(order 순) + 탭에는 없지만 "오늘 이후 예약" 또는 "아직 끝나지 않은
+// 기간규칙"이 남아 있는 방(맨 뒤). 목록이 어긋나도 예약이 있는 방이 화면에서 숨겨지지 않게 한다.
+// 지난 예약만 남은 방은 보충하지 않는다(옛 방이 되살아나지 않도록).
+function roomsForClient_(rooms, reservations, dateRules) {
+  const names = rooms.slice().sort((a, b) => (a.order || 0) - (b.order || 0)).map(r => r.name);
+  const known = {};
+  names.forEach(n => { known[String(n).trim()] = true; });
+  const today = Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd');
+  const extra = [];
+  const add = room => {
+    const n = String(room == null ? '' : room).trim();
+    if (n && !known[n]) { known[n] = true; extra.push(n); }
+  };
+  reservations.forEach(r => { if (String(r.date) >= today) add(r.room); });
+  dateRules.forEach(r => { if (String(r.endDate) >= today) add(r.room); });
+  return names.concat(extra.sort());
+}
+
 function json(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
 }
 
-// ===== 변경 로그 (없어진 것: 삭제·수정·가림) =====
+// ===== 변경 로그 (삭제·수정·가림·특별실 추가/순서변경/삭제) =====
 const LOG_CAP = 3000;
 
 function appendLog(action, summary) {
@@ -580,4 +644,36 @@ function dateRuleSummary(r) {
   try { days = JSON.parse(r.daysOfWeek); } catch (e) {}
   const blk = (r.blocked === true || r.blocked === 'true') ? ' (예약금지)' : '';
   return `${r.room} ${plainStr(r.startDate)}~${plainStr(r.endDate)} [${(days || []).join(',')}] ${(periods || []).join('·')}교시 · "${plainStr(r.label)}"${blk}`;
+}
+
+// ===== 자동 백업 — 매일 새벽 시트 사본을 저장하고 30일치만 보관 =====
+// 사용법(한 번만): Apps Script 편집기에서 함수 선택 창에 setupBackup 을 고르고 ▶ 실행 → Drive 접근 허용.
+// 사본은 내 드라이브의 "특별실예약-백업" 폴더에 "<시트이름>-백업-YYYY-MM-DD" 로 쌓인다.
+// 문제가 생기면 그 날짜의 사본을 열어 필요한 탭의 내용만 복사해 운영 시트에 붙여넣는다(시트 전체 복원 금지).
+const BACKUP_FOLDER = '특별실예약-백업';
+const BACKUP_KEEP_DAYS = 30;
+
+function setupBackup() {
+  ScriptApp.getProjectTriggers()
+    .filter(t => t.getHandlerFunction() === 'dailyBackup')
+    .forEach(t => ScriptApp.deleteTrigger(t));
+  ScriptApp.newTrigger('dailyBackup').timeBased().everyDays(1).atHour(3).inTimezone('Asia/Seoul').create();
+  dailyBackup();   // 설정하자마자 한 번 실행해서 바로 확인할 수 있게
+}
+
+function dailyBackup() {
+  const file = DriveApp.getFileById(SHEET_ID);
+  const folders = DriveApp.getFoldersByName(BACKUP_FOLDER);
+  const folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(BACKUP_FOLDER);
+  const prefix = file.getName() + '-백업-';
+  const name = prefix + Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd');
+  if (!folder.getFilesByName(name).hasNext()) file.makeCopy(name, folder);   // 같은 날 두 번 만들지 않음
+
+  // 오래된 백업은 휴지통으로 (30일간 복구 가능). 이 폴더 안에서 이름이 prefix 로 시작하는 것만 대상.
+  const cutoff = Date.now() - BACKUP_KEEP_DAYS * 24 * 60 * 60 * 1000;
+  const files = folder.getFiles();
+  while (files.hasNext()) {
+    const f = files.next();
+    if (f.getName().indexOf(prefix) === 0 && f.getDateCreated().getTime() < cutoff) f.setTrashed(true);
+  }
 }
